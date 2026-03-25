@@ -1,5 +1,5 @@
 import telebot
-import pandas_ta as ta
+import pandas-ta as ta
 import time
 import os
 from datetime import datetime, timedelta
