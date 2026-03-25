@@ -6,8 +6,10 @@ from datetime import datetime, timedelta
 from vnstock import *
 
 # --- CONFIG ---
-TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
-CHAT_ID = os.getenv('1736294695')
+if TOKEN
+   TOKEN = int('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
+if CHAT_ID
+   CHAT_ID = int('1736294695')
 bot = telebot.TeleBot('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
 
 # Danh sách 120 mã chọn lọc
