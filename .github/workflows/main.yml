@@ -11,6 +11,8 @@ on:
     - cron: '*/5 2,3,4,5,6,7 * * 1-5'
     # Chạy thêm các phút đầu giờ thứ 8 UTC để chốt phiên (15h - 15h15 VN)
     - cron: '0,5,10,15 8 * * 1-5'
+jobs:
+  run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
