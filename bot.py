@@ -1,16 +1,26 @@
-import telebot
-import pandas-ta as ta
-import time
 import os
-from datetime import datetime, timedelta
+import pandas_ta as ta
+import pandas as pd
+import telebot
 from vnstock import *
 
-# --- CONFIG ---
-if TOKEN
-   TOKEN = int('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
-if CHAT_ID
-   CHAT_ID = int('1736294695')
+# 1. Lấy cấu hình từ GitHub Secrets
+TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
+CHAT_ID = os.getenv('1736294695')
+
+# 2. Ép kiểu CHAT_ID sang số nguyên để tránh lỗi "chat not found"
+try:
+    CHAT_ID = int('1736294695')
+except:
+    print("Loi: CHAT_ID khong hop le!")
+
 bot = telebot.TeleBot('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
+
+# 3. Gửi tin nhắn kiểm tra đầu tiên
+try:
+    bot.send_message(CHAT_ID, "🚀 Bot Scan Cổ Phiếu đã bắt đầu chạy...")
+except Exception as e:
+    print(f"Loi gui tin nhan Telegram: {e}")
 
 # Danh sách 120 mã chọn lọc
 WATCHLIST = [
