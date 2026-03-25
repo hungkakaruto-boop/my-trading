@@ -23,11 +23,8 @@ jobs:
     - name: Install Dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install setuptools wheel
-        pip install pyTelegramBotAPI vnstock pandas
-        # Cài đặt pandas-ta từ link dự phòng để tránh lỗi 404 hoặc không tìm thấy bản phân phối
-        pip install https://github.com/twopirllc/pandas-ta/archive/refs/heads/master.zip
-
+        pip install pandas==2.0.3 pyTelegramBotAPI vnstock
+        pip install pandas-ta==0.3.14b0
     - name: Execute Scanner
       env:
         TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
