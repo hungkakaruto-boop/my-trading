@@ -5,10 +5,10 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
   schedule:
-    # Chạy mỗi 5 phút (*/5) 
+    # Chạy mỗi 10 phút (*/10) 
     # Từ giờ thứ 2 đến hết giờ thứ 7 UTC (9h sáng - 14h55 VN)
     # Từ thứ 2 đến thứ 6 (1-5)
-    - cron: '*/5 2,3,4,5,6,7 * * 1-5'
+    - cron: '*/10 2,3,4,5,6,7 * * 1-5'
     # Chạy thêm các phút đầu giờ thứ 8 UTC để chốt phiên (15h - 15h15 VN)
     - cron: '0,5,10,15 8 * * 1-5'
 jobs:
