@@ -5,35 +5,37 @@ on:
     branches: [ "main" ]
   workflow_dispatch:
   schedule:
-    - cron: '0 2 * * 1-5' # Chạy lúc 9h sáng VN từ Thứ 2 đến Thứ 6
+    - cron: '0 2 * * 1-5' # Chạy lúc 9h sáng VN (T2-T6)
 
 jobs:
-  build:
+  run-bot:
     runs-on: ubuntu-latest
-
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Set up Python 3.9
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9' # Bản 3.9 là ổn định nhất cho pandas-ta
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
 
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install pandas==2.0.3 pyTelegramBotAPI vnstock
-        pip install pandas-ta==0.3.14b0
-    - name: Execute Scanner
-      env:
-        TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
-        TELEGRAM_CHAT_ID: ${{'1736294695'}}
-      run: |
-        # Đảm bảo file bot.py tồn tại trước khi chạy
-        if [ -f "bot.py" ]; then
-          python bot.py
-        else
-          echo "Không tìm thấy file bot.py trong thư mục gốc!"
-          exit 1
-        fi
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel
+          pip install pandas==2.0.3
+          pip install pyTelegramBotAPI vnstock
+          # Cài đúng phiên bản ổn định nhất của pandas-ta
+          pip install pandas-ta==0.3.14b0
+
+      - name: Execute Scanner
+        env:
+          TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
+          TELEGRAM_CHAT_ID: ${{'1736294695'}}
+        run: |
+          if [ -f "bot.py" ]; then
+            python bot.py
+          else
+            echo "LOI: Khong tim thay file bot.py! Ban hay kiem tra lai ten file."
+            exit 1
+          fi
