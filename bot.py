@@ -23,17 +23,19 @@ try:
 except Exception as e:
     print(f"Loi gui tin nhan Telegram: {e}")
 
-# 4. Hàm phân tích và chấm điểm
+# 4. Bộ não phân tích Wyckoff
 def calculate_signal_score(ticker):
     try:
+        # Lấy dữ liệu 6 tháng để soi nền giá
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
         df = stock_historical_data(ticker, start_date, end_date, "1D")
         
         if df.empty or len(df) < 50: return 0, ""
 
+        # Lọc thanh khoản > 500k cổ/phiên để đảm bảo T+10 an toàn
         avg_vol = df['volume'].tail(20).mean()
-        if avg_vol < 500000: return 0, "" # Bỏ qua mã thanh khoản thấp
+        if avg_vol < 500000: return 0, ""
 
         score = 0
         details = []
