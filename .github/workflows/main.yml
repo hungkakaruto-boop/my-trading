@@ -24,7 +24,7 @@ jobs:
 
       - name: Execute Scanner
         env:
-          TELEGRAM_TOKEN: ${{ secrets.8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4 }}
-          TELEGRAM_CHAT_ID: ${{ secrets.1736294695 }}
+          TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
+          TELEGRAM_CHAT_ID: ${{'1736294695'}}
         run: python bot.py
           
