@@ -28,9 +28,61 @@ def calculate_signal_score(ticker):
     try:
         end_date = datetime.now().strftime("%Y-%m-%d")
         start_date = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
-        
         df = stock_historical_data(ticker, start_date, end_date, "1D")
+        
         if df.empty or len(df) < 50: return 0, ""
+
+        avg_vol = df['volume'].tail(20).mean()
+        if avg_vol < 500000: return 0, "" # Bỏ qua mã thanh khoản thấp
+
+        score = 0
+        details = []
+        
+        # Chỉ báo kỹ thuật
+        df['MA20'] = ta.sma(df['close'], length=20)
+        df['MA50'] = ta.sma(df['close'], length=50)
+        df['RSI'] = ta.rsi(df['close'], length=14)
+        
+        curr = df.iloc[-1]
+        prev = df.iloc[-2]
+
+        # --- NÂNG CẤP MỤC 1: DÒNG TIỀN & HÀNH ĐỘNG GIÁ (40 ĐIỂM) ---
+        # Kiểm tra nến rút chân (Pinbar) - Dấu hiệu hấp thụ cung của Cá mập
+        body = abs(curr['close'] - curr['open'])
+        lower_shadow = min(curr['close'], curr['open']) - curr['low']
+        is_pinbar = lower_shadow > (body * 1.5) # Bóng nến dưới dài gấp 1.5 lần thân
+        
+        if curr['volume'] > avg_vol * 1.8 and curr['close'] > prev['close']:
+            score += 40
+            details.append(f"🔥 Siêu dòng tiền: SOS cực mạnh ({round(curr['volume']/avg_vol, 1)}x)")
+        elif is_pinbar and curr['volume'] > avg_vol:
+            score += 30
+            details.append("⚓ Wyckoff: Nến rút chân hấp thụ cung (Spring)")
+        elif curr['volume'] > avg_vol:
+            score += 15
+            details.append("📈 Vol tích cực: Cao hơn trung bình")
+
+        # --- CÁC MỤC CÒN LẠI ---
+        # Xu hướng (30đ)
+        if curr['close'] > curr['MA20'] > curr['MA50']:
+            score += 30
+            details.append("✅ Xu hướng: Uptrend bền vững")
+        
+        # RSI & Vùng mua (20đ)
+        if 45 < curr['RSI'] < 65:
+            score += 20
+            details.append(f"💎 RSI: {round(curr['RSI'], 1)} (Chưa quá mua)")
+            
+        # Sức mạnh giá (10đ)
+        change = (curr['close'] - prev['close']) / prev['close'] * 100
+        if change > 2:
+            score += 10
+            details.append(f"🚀 Giá: Tăng tốt ({round(change, 1)}%)")
+
+        return score, "\n".join(details)
+    except:
+        return 0, ""
+
 
         # Tính trung bình Vol 20 phiên
         avg_vol = df['volume'].tail(20).mean()
