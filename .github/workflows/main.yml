@@ -1,12 +1,13 @@
 name: Stock Scanner Bot Final
-
 on:
-  push:
-    branches: [ "main" ]
+  schedule:
+    # Quét mỗi 7 phút (*/7)
+    # Từ 2h sáng đến 7h59 sáng UTC (9h00 - 14h59 VN)
+    - cron: '*/7 2,3,4,5,6,7 * * 1-5'
+    # Quét thêm lúc 15h00 VN để chốt số cuối ngày
+    - cron: '0 8 * * 1-5'
   workflow_dispatch:
 
-jobs:
-  run-bot:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
