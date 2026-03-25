@@ -1,4 +1,4 @@
-name: Stock Scanner Bot
+name: Stock Scanner Bot Final
 
 on:
   push:
@@ -12,25 +12,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.10
+      - name: Setup Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12' # Bắt buộc dùng 3.12 để khớp với pandas-ta
 
-      - name: Install Dependencies
+      - name: Install Libs
         run: |
           python -m pip install --upgrade pip
-          # Cài đặt công cụ nền để tránh lỗi pkg_resources
-          pip install setuptools==69.5.1 wheel 
-          # Cài đặt các thư viện chính từ kho chính thức (không dùng link GitHub)
-          pip install pandas==2.0.3 pyTelegramBotAPI vnstock
-          # Cài pandas-ta bản ổn định nhất hiện nay
-          pip install pandas-ta==0.3.14b0
+          pip install setuptools wheel
+          # Cài các thư viện chính từ nguồn ổn định nhất
+          pip install pandas pyTelegramBotAPI vnstock
+          # Cài pandas-ta bản mới nhất phù hợp với Python 3.12
+          pip install pandas-ta
 
       - name: Execute Scanner
         env:
           TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
           TELEGRAM_CHAT_ID: ${{'1736294695'}}
         run: |
-          # Lệnh chạy bot và tự động sửa lỗi nếu thiếu thư viện lúc chạy
-          python bot.py
+          # Kiểm tra vị trí file trước khi chạy để tránh lỗi No such file
+          echo "Checking files in directory:"
+          ls -la
+          if [ -f "bot.py" ]; then
+            python bot.py
+          else
+            echo "LOI: Khong tim thay file bot.py. Hay kiem tra lai ten file tren GitHub!"
+            exit 1
+          fi
