@@ -20,7 +20,8 @@ jobs:
           python-version: '3.10'
 
       - name: Install Libs
-        run: pip install pyTelegramBotAPI pandas-ta vnstock pandas
+        run: pip install pyTelegramBotAPI vnstock pandas
+        pip install pandas-ta --no-dependencies 
 
       - name: Execute Scanner
         env:
