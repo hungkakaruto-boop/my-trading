@@ -4,8 +4,6 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-  schedule:
-    - cron: '0 2 * * 1-5' # Chạy lúc 9h sáng VN (T2-T6)
 
 jobs:
   run-bot:
@@ -15,23 +13,29 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Setup Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
-          python-version: '3.12'  # Nâng cấp từ 3.10 lên 3.12
+          python-version: '3.10'
+          cache: 'pip' # Tuỳ chọn thông minh giúp chạy nhanh hơn ở lần sau
 
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install setuptools wheel
+          # Cài các lib cơ bản trước
+          pip install pandas==2.0.3 pyTelegramBotAPI vnstock
+          # Dùng lệnh cài đặt cưỡng bức phiên bản ổn định nhất
+          pip install pandas-ta==0.3.14b0 --no-cache-dir
 
       - name: Execute Scanner
         env:
           TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
           TELEGRAM_CHAT_ID: ${{'1736294695'}}
         run: |
+          # Kiểm tra file bot.py có tồn tại không trước khi chạy
           if [ -f "bot.py" ]; then
             python bot.py
           else
-            echo "LOI: Khong tim thay file bot.py! Ban hay kiem tra lai ten file."
+            echo "Lỗi: Không tìm thấy file bot.py trong Repo!"
             exit 1
           fi
