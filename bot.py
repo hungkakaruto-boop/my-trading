@@ -5,10 +5,12 @@ import pandas as pd
 import pandas_ta as ta
 import telebot
 from vnstock import *
-import datetime # <--- THÊM DÒNG NÀY VÀO ĐỂ FIX LỖI "name datetime is not defined"
+import datetime
 from datetime import datetime, timedelta
 import concurrent.futures
 
+# ĐỊNH NGHĨA BIẾN vn_tz TRƯỚC KHI SỬ DỤNG
+vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
 # 1. Lấy cấu hình từ GitHub Secrets
 TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
 CHAT_ID = os.getenv('1736294695')
