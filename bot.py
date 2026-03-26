@@ -1,9 +1,12 @@
 import os
 import time
-import pandas_ta as ta
+import pytz
 import pandas as pd
+import pandas_ta as ta
 import telebot
 from vnstock import *
+import datetime # <--- THÊM DÒNG NÀY VÀO ĐỂ FIX LỖI "name datetime is not defined"
+from datetime import datetime, timedelta
 import concurrent.futures
 
 # 1. Lấy cấu hình từ GitHub Secrets
