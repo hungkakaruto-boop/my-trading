@@ -4,6 +4,7 @@ import pandas_ta as ta
 import pandas as pd
 import telebot
 from vnstock import *
+import concurrent.futures
 
 # 1. Lấy cấu hình từ GitHub Secrets
 TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
