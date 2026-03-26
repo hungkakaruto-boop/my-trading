@@ -22,104 +22,120 @@ try:
     bot.send_message(CHAT_ID, "🚀 Bot Scan Cổ Phiếu đã bắt đầu chạy...")
 except Exception as e:
     print(f"Loi gui tin nhan Telegram: {e}")
-# 2. Hàm chấm điểm Wyckoff
-def calculate_signal_score(ticker):
+# 2. TÍNH TỶ LỆ VOLUME DỰ KIẾN (GIÚP NHẬY BÉN BUỔI SÁNG)
+# ==========================================
+def get_volume_projection_ratio():
+    now = datetime.now(vn_tz)
+    # Giờ khớp lệnh: Sáng 9:15-11:30 (135p), Chiều 13:00-14:30 (90p). Tổng 225p.
+    if now.hour < 9 or (now.hour == 9 and now.minute < 15): return 0.05
+    if now.hour >= 15: return 1.0
+
+    if now.hour < 12:
+        elapsed = (now.hour - 9) * 60 + now.minute - 15
+    else:
+        elapsed = 135 + (now.hour - 13) * 60 + now.minute
+    
+    elapsed = max(10, min(elapsed, 225))
+    return elapsed / 225
+
+# ==========================================
+# 3. LOGIC WYCKOFF & VSA (PHÂN TÍCH CHUYÊN SÂU)
+# ==========================================
+def calculate_signal_score(ticker, is_market_uptrend):
     try:
-        end_date = datetime.now().strftime("%Y-%m-%d")
-        start_date = (datetime.now() - timedelta(days=180)).strftime("%Y-%m-%d")
-        df = stock_historical_data(ticker, start_date, end_date, "1D")
-        
-        if df.empty or len(df) < 50: 
-            return 0, ""
+        now_vn = datetime.now(vn_tz)
+        df = stock_historical_data(ticker, (now_vn - timedelta(days=160)).strftime("%Y-%m-%d"), now_vn.strftime("%Y-%m-%d"), "1D", "stock")
+        if df.empty or len(df) < 50: return None
 
-        avg_vol = df['volume'].tail(20).mean()
-        if avg_vol < 500000: 
-            return 0, ""
-
-        score = 0
-        details = []
-        
+        # Tính Indicators
         df['MA20'] = ta.sma(df['close'], length=20)
-        df['MA50'] = ta.sma(df['close'], length=50)
-        df['RSI'] = ta.rsi(df['close'], length=14)
+        df['Low_20'] = df['low'].rolling(window=20).min()
         
         curr = df.iloc[-1]
         prev = df.iloc[-2]
-
-        # Logic Wyckoff & Dòng tiền
-        body = abs(curr['close'] - curr['open'])
-        lower_shadow = min(curr['close'], curr['open']) - curr['low']
-        is_pinbar = lower_shadow > (body * 1.5)
+        avg_vol_20 = df['volume'].iloc[:-1].tail(20).mean()
         
-        if curr['volume'] > avg_vol * 1.8 and curr['close'] > prev['close']:
-            score += 40
-            details.append(f"🔥 SOS: Tiền vào mạnh ({round(curr['volume']/avg_vol, 1)}x)")
-        elif is_pinbar and curr['volume'] > avg_vol:
-            score += 30
-            details.append("⚓ Spring: Rút chân hấp thụ")
-        elif curr['volume'] > avg_vol:
-            score += 15
-            details.append("📈 Vol tích cực")
+        # Volume Projection (Ước tính Vol cả ngày)
+        ratio = get_volume_projection_ratio()
+        projected_vol = curr['volume'] / ratio
+        vol_factor = projected_vol / avg_vol_20
 
-        if curr['close'] > curr['MA20'] > curr['MA50']:
-            score += 30
-            details.append("✅ Xu hướng: Uptrend")
+        score = 0
+        details = []
+        signal_type = ""
         
-        if 45 < curr['RSI'] < 65:
-            score += 20
-            details.append(f"💎 RSI: {round(curr['RSI'], 1)}")
-            
-        change = (curr['close'] - prev['close']) / prev['close'] * 100
-        if change > 2:
-            score += 10
-            details.append(f"🚀 Giá tăng: {round(change, 1)}%")
+        # --- LOGIC 1: SPRING / SHAKEOUT (RŨ BỎ CUỐI) ---
+        # Giá chạm hoặc thủng đáy 20 phiên nhưng rút chân tăng lại
+        is_spring_zone = curr['low'] <= df['Low_20'].iloc[-2] * 1.005 
+        if is_spring_zone and curr['close'] > prev['close']:
+            if vol_factor < 1.0: # Cạn cung (Spring chuẩn Wyckoff)
+                score += 85
+                signal_type = "⚓ SPRING (CẠN CUNG)"
+                details.append("Rũ bỏ thủng đáy với Vol thấp -> Cực đẹp, dễ nổ")
+            else:
+                score += 60
+                signal_type = "🌪 SHAKEOUT (HẤP THỤ)"
+                details.append(f"Rũ bỏ Vol lớn ({round(vol_factor,1)}x) -> Cần đợi nhịp Test")
 
-        return score, "\n".join(details)
-    except Exception:
-        return 0, ""
+        # --- LOGIC 2: SOS (DÒNG TIỀN ĐẨY GIÁ) ---
+        if curr['close'] > prev['close'] and vol_factor > 1.8 and curr['close'] > curr['MA20']:
+            score += 70
+            signal_type = "🔥 SOS (DÒNG TIỀN)"
+            details.append(f"Dòng tiền vào cực mạnh (Dự kiến {round(vol_factor,1)}x TB)")
 
-# 3. Quét danh mục & Hiển thị tiến độ (Loading)
+        # --- HIỆU CHỈNH ĐIỂM THEO THỊ TRƯỜNG & MA ---
+        if not is_market_uptrend: score -= 20
+        if curr['close'] > curr['MA20']: score += 10
+
+        if score >= 75:
+            chart_link = f"https://fireant.vn/dashboard/symbol/{ticker}"
+            msg = f"Mẫu hình: **{signal_type}**\n- {chr(10).join(details)}\n📊 [Xem Chart]({chart_link})"
+            return {'ticker': ticker, 'score': score, 'msg': msg}
+        return None
+    except: return None
+
+# ==========================================
+# 4. DANH SÁCH 150 MÃ MẠNH NHẤT (TUYỂN CHỌN)
+# ==========================================
 def main_scanner():
     watch_list = [
-        "ACB", "BCM", "BID", "BVH", "CTG", "FPT", "GAS", "GVR", "HDB", "HPG", 
-        "MBB", "MSN", "MWG", "PLX", "POW", "SAB", "SHB", "SSB", "SSI", "STB", 
-        "TCB", "TPB", "VCB", "VHM", "VIB", "VIC", "VJC", "VNM", "VPB", "VRE",
-        "VND", "VCI", "HCM", "SHS", "MBS", "FTS", "BSI", "CTS", "AGR", "VIX", "ORS",
-        "DIG", "DXG", "PDR", "NVL", "NLG", "KDH", "KBC", "IDC", "SZC", "VGC", "CEO", "TCH", 
-        "HSG", "NKG", "VGS", "VCG", "LCG", "HHV", "CTD", "PC1", "DGC", "DCM", "DPM", "DGW", 
-        "FRT", "PNJ", "PVS", "PVD", "PVT", "BSR", "GMD", "HAH", "DBC", "HAG", "VHC", "ANV", "TNG"
+        "ACB","BID","CTG","FPT","GAS","GVR","HDB","HPG","MBB","MSN","MWG","PLX","POW","SAB","SHB","SSB","SSI","STB","TCB","TPB","VCB","VHM","VIB","VIC","VJC","VNM","VPB","VRE",
+        "VND","VCI","HCM","SHS","MBS","FTS","BSI","CTS","AGR","VIX","ORS","TVB","TVS","BVS",
+        "DIG","DXG","PDR","NVL","NLG","KDH","KBC","IDC","SZC","VGC","CEO","TCH","HQC","SCR","DXS","L14","HDG","D2D",
+        "HSG","NKG","VGS","SMC","TLH",
+        "VCG","LCG","HHV","CTD","PC1","C4G","FCN","HBC","CIAS","REE","TV2",
+        "DGC","DCM","DPM","CSV","LAS","BFC",
+        "DGW","FRT","PNJ","PET","HAX",
+        "PVS","PVD","PVT","BSR","GAS","PLX","CNG","OIL",
+        "GMD","HAH","VSC","VOS","PVT",
+        "DBC","HAG","BAF","VHC","ANV","IDI","ASM","MPC","CMX",
+        "TNG","MSH","GIL","VGT","STK",
+        "VGI","CTR","FOX","TTN",
+        "REE","GEG","NT2","QTP","HDG","BCG","TV2"
     ]
-    
-    total = len(watch_list)
-    scored_list = []
-    
-    # Gửi tin nhắn bắt đầu
-    status_msg = bot.send_message(CHAT_ID, f"🚀 Bắt đầu quét {total} mã tiềm năng...")
-    
-    for i, ticker in enumerate(watch_list, 1):
-        score, details = calculate_signal_score(ticker)
-        if score >= 70: 
-            scored_list.append({'ticker': ticker, 'score': score, 'details': details})
-        
-        # Cập nhật tiến độ sau mỗi 20 mã để không bị Telegram chặn spam
-        if i % 20 == 0:
-            bot.edit_message_text(f"⏳ Đang quét: {i}/{total} mã...", CHAT_ID, status_msg.message_id)
-        
-        time.sleep(0.6)
+    watch_list = list(set(watch_list)) # Xóa mã trùng
 
-    scored_list.sort(key=lambda x: x['score'], reverse=True)
+    # Kiểm tra VN-Index
+    try:
+        df_vn = stock_historical_data("VNINDEX", (datetime.now(vn_tz)-timedelta(days=30)).strftime("%Y-%m-%d"), datetime.now(vn_tz).strftime("%Y-%m-%d"), "1D", "index")
+        is_market_uptrend = df_vn.iloc[-1]['close'] > ta.sma(df_vn['close'], length=20).iloc[-1]
+    except: is_market_uptrend = True
+
+    scored_list = []
+    # Đa luồng xử lý 150 mã trong ~10 giây
+    with concurrent.futures.ThreadPoolExecutor(max_workers=15) as executor:
+        futures = [executor.submit(calculate_signal_score, t, is_market_uptrend) for t in watch_list]
+        for f in concurrent.futures.as_completed(futures):
+            res = f.result()
+            if res: scored_list.append(res)
 
     if scored_list:
-        message = "🏆 **BẢNG XẾP HẠNG WYCKOFF T+10** 🏆\n━━━━━━━━━━━━━━━━━━━━\n\n"
+        scored_list.sort(key=lambda x: x['score'], reverse=True)
+        now_str = datetime.now(vn_tz).strftime("%H:%M")
+        msg = f"🚀 **WYCKOFF REAL-TIME ({now_str})**\nVN-Index: {'✅ OK' if is_market_uptrend else '⚠️ YẾU'}\n"
         for item in scored_list:
-            rank = "🌟 SIÊU CỔ" if item['score'] >= 90 else "🎯 TIỀM NĂNG"
-            message += f"{rank}: **{item['ticker']}**\n📊 Điểm: `{item['score']}/100`\n{item['details']}\n━━━━━━━━━━━━━━━━━━━━\n"
-        bot.send_message(CHAT_ID, message, parse_mode="Markdown")
-    else:
-        bot.send_message(CHAT_ID, "⚠️ Phiên này chưa có mã nào đạt tiêu chuẩn lọc.")
-    
-    # Xóa tin nhắn trạng thái loading khi xong
-    bot.delete_message(CHAT_ID, status_msg.message_id)
+            msg += f"\n💎 **{item['ticker']}** (Điểm: {item['score']})\n{item['msg']}\n"
+        bot.send_message(CHAT_ID, msg, parse_mode="Markdown", disable_web_page_preview=True)
 
 if __name__ == "__main__":
     main_scanner()
