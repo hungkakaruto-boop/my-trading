@@ -30,6 +30,8 @@ jobs:
       - name: 4. Execute Scanner
         env:
           # Dán trực tiếp Token vào đây để tránh lỗi lấy biến môi trường
-          BOT_TOKEN: "8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4"
-          BOT_CHAT_ID: "1736294695"
+          TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
+          TELEGRAM_CHAT_ID: ${{'1736294695'}}
+        run: python bot.py
+          fi
         run: python bot.py
