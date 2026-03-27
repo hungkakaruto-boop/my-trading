@@ -39,89 +39,98 @@ try:
     bot.send_message(CHAT_ID, "🚀 Bot Scan Cổ Phiếu (FireAnt Data) đã bắt đầu chạy...")
 except Exception as e:
     print(f"Lỗi gửi tin nhắn Telegram: {e}")
-def get_150_watchlist():
-    """Tự động lấy 150 mã mạnh nhất thị trường (VN100 + HNX30 + Penny thanh khoản)"""
-    try:
-        vn100 = vnindex_constituent_compositions(index='VN100')['ticker'].tolist()
-        hnx30 = hnx30_constituent_compositions()['ticker'].tolist()
-        # Thêm các mã bạn quan tâm đặc biệt
-        fav = ['PC1', 'GEX', 'PDR', 'POW', 'SSI', 'VND', 'DIG', 'NLG', 'MVN', 'ACV']
-        full_list = list(set(vn100 + hnx30 + fav))
-        return full_list[:150]
-    except:
-        # Nếu lỗi API, dùng list cứng dự phòng
-        return ['SSI', 'VND', 'TCB', 'HDB', 'HPG', 'HSG', 'NKG', 'PDR', 'DIG', 'DXG', 'VHM', 'VIC', 'MSN', 'FPT', 'MWG']
+        print(f"Lỗi {symbol}: {e}")
+# --- DANH SÁCH 150 MÃ CHI TIẾT ---
+WATCHLIST = [
+    'VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB',
+    'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', 'PSI', 'IVS', 'TCI', 'WSS',
+    'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 
+    'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', 'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', 'VCG', 'HHV', 'LCG', 
+    'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', 'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', 'DGC', 
+    'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', 'GEG', 'NT2', 'HDG', 'TTA', 'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 
+    'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', 'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', 
+    'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', 'TNG', 'MSH', 'GIL', 'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI'
+]
 
 # ==========================================
-# 2. BỘ NÃO PHÂN TÍCH (LOGIC "THẦN THÁNH")
+# 2. BỘ NÃO PHÂN TÍCH (ZERO-ERROR LOGIC)
 # ==========================================
-def analyze_god_mode(symbol):
+def analyze_ultimate(symbol):
     try:
-        # Lấy dữ liệu 100 phiên gần nhất
+        # Lấy dữ liệu 150 phiên để tính toán chỉ báo chuẩn
         df = stock_historical_data(symbol, "2024-01-01", datetime.now().strftime('%Y-%m-%d'), "1D")
-        if len(df) < 50: return None
+        if df.empty or len(df) < 100: return None
 
         # --- CHỈ BÁO KỸ THUẬT ---
-        # 1. Giảm độ trễ cực thấp với Hull Moving Average
         df['hma21'] = ta.hma(df['close'], length=21)
         df['ema50'] = ta.ema(df['close'], length=50)
+        df['ema200'] = ta.ema(df['close'], length=200)
         
-        # 2. Chỉ báo MCDX (Dòng tiền Cá mập - Cột đỏ)
+        # MCDX (Cá mập)
         df['rsi'] = ta.rsi(df['close'], length=13)
         df['banker'] = ((df['rsi'] - 30) * 2.5).clip(lower=0, upper=100)
+        
+        # Độ nén (BB Width) & ADX
+        bb = ta.bbands(df['close'], length=20, std=2)
+        df['bb_width'] = (bb['BBU_20_2.0'] - bb['BBL_20_2.0']) / bb['BBM_20_2.0']
+        adx = ta.adx(df['high'], df['low'], df['close'], length=14)
+        df['adx'] = adx['ADX_14']
 
-        # 3. Lọc nhiễu ADX (Chỉ đánh khi có trend rõ ràng)
-        adx_df = ta.adx(df['high'], df['low'], df['close'], length=14)
-        df['adx'] = adx_df['ADX_14']
-        
-        # 4. Đo lường Volume
-        df['vol_avg'] = df['volume'].rolling(window=20).mean()
-        
-        # --- LOGIC QUYẾT ĐỊNH ---
+        # --- LOGIC TRIGGER ---
         last = df.iloc[-1]
         high_10 = df['high'].shift(1).rolling(window=10).max().iloc[-1]
+        vol_avg = df['volume'].rolling(window=20).mean().iloc[-1]
         
-        is_uptrend = (last['close'] > last['hma21']) and (last['hma21'] > last['ema50'])
-        
-        # KỊCH BẢN 1: MUA PULLBACK (Chạm hỗ trợ nảy lên - Giống MSN)
-        if is_uptrend and (last['low'] <= last['hma21']) and (last['close'] > last['hma21']) and (last['banker'] > 35):
-            return {"symbol": symbol, "type": "🔥 ĐIỂM MUA HỖ TRỢ (PULLBACK)", "price": last['close'], "banker": round(last['banker'], 1)}
+        # Điều kiện Trend Kênh Trên (Quan trọng nhất)
+        is_uptrend = (last['close'] > last['ema50']) and (last['ema50'] > last['ema200'])
 
-        # KỊCH BẢN 2: MUA BÙNG NỔ (Nổ Vol, Cá mập đẩy - Giống MVN)
-        if (last['close'] > high_10) and (last['banker'] > 55) and (last['volume'] > last['vol_avg'] * 1.3) and (last['adx'] > 25):
-            return {"symbol": symbol, "type": "🚀 ĐIỂM MUA BÙNG NỔ (BREAKOUT)", "price": last['close'], "banker": round(last['banker'], 1)}
+        # TH1: PULLBACK (Chạm viền đỏ nảy lên)
+        if is_uptrend and (last['low'] <= last['hma21']) and (last['close'] > last['hma21']) \
+           and (last['close'] > last['open']) and (last['banker'] > 35):
+            return {"type": "🔥 MUA PULLBACK (HỖ TRỢ)", "price": last['close'], "banker": round(last['banker'], 1)}
 
-    except Exception as e:
-        print(f"Lỗi {symbol}: {e}")
+        # TH2: BREAKOUT (Nổ giá vượt nền)
+        if is_uptrend and (last['close'] > high_10) and (last['bb_width'] < 0.15) \
+           and (last['volume'] > vol_avg * 1.5) and (last['banker'] > 50):
+            return {"type": "🚀 MUA BÙNG NỔ (BREAKOUT)", "price": last['close'], "banker": round(last['banker'], 1)}
+
+    except: return None
     return None
 
 # ==========================================
-# 3. ĐỊNH DẠNG TIN NHẮN & VẬN HÀNH
+# 3. HÀM VẬN HÀNH & THÔNG BÁO TIẾN TRÌNH
 # ==========================================
-def send_telegram(data):
-    msg = f"🔔 **TÍN HIỆU CHIẾN THUẬT: {data['symbol']}**\n"
-    msg += f"━━━━━━━━━━━━━━━━━━\n"
-    msg += f"📍 Trạng thái: **{data['type']}**\n"
-    msg += f"💰 Giá vào: **{data['price']}**\n"
-    msg += f"🐳 Cá mập (MCDX): `{data['banker']}%` đỏ\n"
-    msg += f"🛡️ Cắt lỗ: Thủng đường HMA21\n"
-    msg += f"━━━━━━━━━━━━━━━━━━\n"
-    msg += f"⚡ *Hành động: Múc quyết liệt, không kỳ kèo giá!*"
-    bot.send_message(CHAT_ID, msg, parse_mode='Markdown')
-
-def run_bot():
-    print(f"🌟 Bắt đầu quét thị trường...")
-    watchlist = get_150_watchlist()
-    print(f"Đã lấy được {len(watchlist)} mã trong danh sách.")
+def main_worker():
+    start_time = datetime.now()
+    bot.send_message(CHAT_ID, f"🔄 **BẮT ĐẦU QUÉT THỊ TRƯỜNG**\n🕒 Lúc: {start_time.strftime('%H:%M:%S')}\n📊 Danh sách: 150 mã tinh hoa.")
     
-    for symbol in watchlist:
-        print(f"--- Đang soi mã: {symbol}") # Thêm dòng này
-        result = analyze_god_mode(symbol)
+    found_count = 0
+    # Gửi một tin nhắn tiến trình để cập nhật liên tục (Tránh spam nhiều tin)
+    progress_msg = bot.send_message(CHAT_ID, "⏳ Đang xử lý: 0/150 mã...")
+
+    for index, symbol in enumerate(WATCHLIST):
+        # Cập nhật trạng thái mỗi 25 mã để người dùng yên tâm
+        if (index + 1) % 25 == 0:
+            bot.edit_message_text(f"⏳ Đang xử lý: {index + 1}/150 mã...", CHAT_ID, progress_msg.message_id)
+
+        result = analyze_ultimate(symbol)
         if result:
-            send_telegram(result)
-            print(f"✅ Đã tìm thấy điểm mua cho {symbol}!")
-        time.sleep(0.5) 
+            found_count += 1
+            msg = f"💎 **TÍN HIỆU: {symbol}**\n"
+            msg += f"━━━━━━━━━━━━━━\n"
+            msg += f"🏅 Chiến thuật: `{result['type']}`\n"
+            msg += f"💵 Giá mua: **{result['price']}**\n"
+            msg += f"🐳 Cá mập: `{result['banker']}%` đỏ\n"
+            msg += f"🛡️ Cắt lỗ: Thủng HMA21\n"
+            msg += f"━━━━━━━━━━━━━━\n"
+            msg += f"✅ *Đã xác nhận hội tụ đủ yếu tố!*"
+            bot.send_message(CHAT_ID, msg, parse_mode='Markdown')
+        
+        time.sleep(0.6) # Tránh bị sàn chặn
+
+    end_time = datetime.now()
+    duration = (end_time - start_time).seconds
+    bot.send_message(CHAT_ID, f"🏁 **HOÀN THÀNH QUÉT MÃ**\n⏱️ Thời gian: {duration} giây.\n🔍 Tìm thấy: {found_count} cơ hội.\n☕ *Chúc bạn giao dịch thành công!*")
 
 if __name__ == "__main__":
-    run_bot()
-        
+    main_worker()
