@@ -75,7 +75,8 @@ def analyze_ultimate(symbol):
         high_10 = df['high'].shift(1).rolling(window=10).max().iloc[-1]
         vol_avg = df['volume'].rolling(window=20).mean().iloc[-1]
         
-        is_uptrend = (last['close'] > last['ema50']) and (last['ema50'] > last['ema200'])
+        # Chỉ cần giá nằm trên đường trung bình ngắn hạn (EMA50) là được, bỏ qua EMA20
+is_uptrend = (last['close'] > last['ema50']) 
 
         # Kịch bản 1: Pullback
         if is_uptrend and (last['low'] <= last['hma21']) and (last['close'] > last['hma21']) \
@@ -83,7 +84,7 @@ def analyze_ultimate(symbol):
             return {"type": "🔥 MUA PULLBACK (HỖ TRỢ)", "price": last['close'], "banker": round(last['banker'], 1)}
 
         # Kịch bản 2: Breakout
-        if is_uptrend and (last['close'] > high_10) and (last['bb_width'] < 0.15) \
+        if is_uptrend and (last['close'] > high_10) and (last['bb_width'] < 0.25)
            and (last['volume'] > vol_avg * 1.5) and (last['banker'] > 50):
             return {"type": "🚀 MUA BÙNG NỔ (BREAKOUT)", "price": last['close'], "banker": round(last['banker'], 1)}
 
