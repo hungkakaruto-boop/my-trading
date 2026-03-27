@@ -180,15 +180,19 @@ def main_worker():
         
         df = pd.DataFrame()
         # Tách riêng block try-except cho Data Fetching
+        df = None
         try:
-            df = stock.stock_historical_data(symbol=symbol, source='TCB', start_date=start_date, end_date=end_date)
-            # Chuyển đổi tên cột cho đồng nhất (đề phòng API đổi format)
-            # Khởi tạo object theo chuẩn vnstock3
-            stock_api = Vnstock().stock(symbol=symbol, source='VCI') 
-            # Lấy dữ liệu lịch sử nến ngày (1D)
-            df = stock_api.quote.history(start=start_date, end=end_date, interval='1D')
+            # DÙNG NGUỒN KBS ĐỂ LÁCH TƯỜNG LỬA TRÊN GITHUB ACTIONS
+            stock_obj = Vnstock().stock(symbol=symbol, source='KBS') 
+            df = stock_obj.quote.history(start=start_date, end=end_date, interval='1D')
+            
+            # Bắt lỗi thêm trường hợp API sống nhưng trả về data rỗng
+            if df is None or df.empty:
+                print(f"⚠️ {symbol}: API KBS trả về dữ liệu trống.")
+                continue
+                
         except Exception as e:
-            print(f"❌ Lỗi API tại mã {symbol}: {e}")
+            print(f"❌ Lỗi API tại mã {symbol} (Có thể do mạng): {e}")
             continue
 
         if df.empty or len(df) < 30:
