@@ -183,11 +183,12 @@ def main_worker():
         try:
             df = stock.stock_historical_data(symbol=symbol, source='TCB', start_date=start_date, end_date=end_date)
             # Chuyển đổi tên cột cho đồng nhất (đề phòng API đổi format)
-            stock_obj = Vnstock().stock(symbol=symbol, source='VCI') 
-            df = stock_obj.quote.history(start=start_date, end=end_date, interval='1D')
+            # Khởi tạo object theo chuẩn vnstock3
+            stock_api = Vnstock().stock(symbol=symbol, source='VCI') 
+            # Lấy dữ liệu lịch sử nến ngày (1D)
+            df = stock_api.quote.history(start=start_date, end=end_date, interval='1D')
         except Exception as e:
-            print(f"Lỗi lấy dữ liệu {symbol}: {e}")
-            # Nếu lỗi, nghỉ 2 giây rồi mới sang mã tiếp theo để tránh bị khóa IP
+            print(f"❌ Lỗi API tại mã {symbol}: {e}")
             continue
 
         if df.empty or len(df) < 30:
