@@ -1,25 +1,20 @@
 import os
 import time
-import pytz
 import pandas as pd
 import pandas_ta as ta
 import telebot
-from vnstock import *
-import datetime
+import pytz
 from datetime import datetime, timedelta
-import concurrent.futures
+# Sửa import sang bản vnstock3 mới nhất
+from vnstock import Vnstock
 
-#  1. Lấy cấu hình từ GitHub Secrets
-TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
-CHAT_ID = os.getenv('1736294695')
+# 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
+TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
+CHAT_ID = '1736294695'
 
-# 2. Ép kiểu CHAT_ID sang số nguyên để tránh lỗi "chat not found"
-try:
-    CHAT_ID = int('1736294695')
-except:
-    print("Loi: CHAT_ID khong hop le!")
-
-bot = telebot.TeleBot('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
+bot = telebot.TeleBot(TOKEN)
+stock = Vnstock()
+vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
 
 # 3. Gửi tin nhắn kiểm tra đầu tiên
 try:
