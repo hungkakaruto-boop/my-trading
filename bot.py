@@ -9,8 +9,8 @@ from datetime import datetime, timedelta
 from vnstock import Vnstock
 
 # 1. CẤU HÌNH HỆ THỐNG
-TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
-CHAT_ID = os.getenv('1736294695')
+TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
+CHAT_ID = '1736294695'
 vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
 
 bot = telebot.TeleBot('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
