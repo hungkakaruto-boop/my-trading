@@ -110,14 +110,17 @@ def send_telegram(data):
     bot.send_message(CHAT_ID, msg, parse_mode='Markdown')
 
 def run_bot():
-    print(f"🌟 Bắt đầu truy quét 150 mã mạnh nhất thị trường...")
+    print(f"🌟 Bắt đầu quét thị trường...")
     watchlist = get_150_watchlist()
+    print(f"Đã lấy được {len(watchlist)} mã trong danh sách.")
+    
     for symbol in watchlist:
+        print(f"--- Đang soi mã: {symbol}") # Thêm dòng này
         result = analyze_god_mode(symbol)
         if result:
             send_telegram(result)
-            print(f"✅ Đã bắn tín hiệu cho {symbol}")
-        time.sleep(0.5) # Tránh bị spam API
+            print(f"✅ Đã tìm thấy điểm mua cho {symbol}!")
+        time.sleep(0.5) 
 
 if __name__ == "__main__":
     run_bot()
