@@ -43,61 +43,60 @@ except Exception as e:
 WATCHLIST = ['VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB', 'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', 'PSI', 'IVS', 'TCI', 'WSS', 'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', 'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', 'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', 'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', 'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', 'GEG', 'NT2', 'HDG', 'TTA', 'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', 'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', 'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', 'TNG', 'MSH', 'GIL', 'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI']
 
 # ==========================================
-# 2. BỘ NÃO PHÂN TÍCH CHUYÊN SÂU
+# 2. BỘ NÃO PHÂN TÍCH (BOSS ENGINE CORE)
 # ==========================================
-class UltimateBossEngine:
+class UltimateBoss:
     def __init__(self, df, symbol):
         self.df = df
         self.symbol = symbol
-        self._prepare_indicators()
+        self._add_indicators()
 
-    def _prepare_indicators(self):
-        # Tầng 1: Xu hướng & Độ nén (Bollinger Squeeze)
+    def _add_indicators(self):
+        # Xu hướng & Nền giá
         self.df['ma20'] = ta.sma(self.df['close'], length=20)
         self.df['vma20'] = ta.sma(self.df['volume'], length=20)
+        
+        # Bollinger Squeeze (Độ nén)
         bb = ta.bbands(self.df['close'], length=20, std=2)
-        # Độ rộng dải Bollinger (Càng nhỏ càng nén chặt)
         self.df['bb_width'] = (bb['BBU_20_2.0'] - bb['BBL_20_2.0']) / bb['BBM_20_2.0']
         
-        # Tầng 2: Động lượng (MACD Slope & RSI)
+        # MACD Gia tốc (Momentum Slope)
         macd = self.df.ta.macd()
         self.df['hist'] = macd['MACDh_12_26_9']
-        self.df['hist_slope'] = self.df['hist'].diff() # Gia tốc hồi phục
-        self.df['rsi'] = ta.rsi(self.df['close'], length=14)
+        self.df['hist_slope'] = self.df['hist'].diff()
         
-        # Tầng 3: Dòng tiền Cá mập (MCDX Hybrid)
+        # MCDX Hybrid (Dòng tiền Cá mập)
         mfi = ta.mfi(self.df['high'], self.df['low'], self.df['close'], self.df['volume'], length=14)
         low_20, high_20 = self.df['low'].rolling(20).min(), self.df['high'].rolling(20).max()
-        banker_p = ((self.df['close'] - low_20) / (high_20 - low_20) * 100).rolling(3).mean()
-        self.df['banker'] = (banker_p * 0.4) + (mfi * 0.6) # Kết hợp giá và dòng tiền
+        banker_raw = ((self.df['close'] - low_20) / (high_20 - low_20) * 100).rolling(3).mean()
+        self.df['banker'] = (banker_raw * 0.4) + (mfi * 0.6)
 
-    def get_comprehensive_score(self):
+    def analyze(self):
         last, prev = self.df.iloc[-1], self.df.iloc[-2]
         score, logs = 0, []
 
-        # --- A. Dòng tiền (Max 3.5đ) ---
+        # --- TẦNG 1: DÒNG TIỀN MỒI (MCDX) - Max 3.5đ ---
         if last['banker'] > 15:
             score += 2.0; logs.append(f"Tiền mồi ({round(last['banker'])}%)")
-            if last['banker'] > prev['banker']: score += 1.5; logs.append("🔥 Gia tốc tiền tăng")
+            if last['banker'] > prev['banker']: score += 1.5; logs.append("🔥 Tiền nạp thêm")
 
-        # --- B. Động lượng MACD (Max 2.5đ) ---
+        # --- TẦNG 2: GIA TỐC HỒI PHỤC (MACD) - Max 2.5đ ---
         if last['hist_slope'] > 0:
             score += 1.5; logs.append("🚀 MACD hướng lên")
-            if last['hist'] > 0: score += 1.0; logs.append("Xung lực dương")
+            if last['hist'] > 0: score += 1.0; logs.append("Xung lực mạnh")
 
-        # --- C. Độ nén & Nền giá (Max 2.0đ) ---
-        if last['bb_width'] < 0.12: 
-            score += 2.0; logs.append("💎 Nén chặt (Squeeze)")
-        elif last['close'] > last['ma20']: 
-            score += 1.0; logs.append("🏠 Trên MA20")
+        # --- TẦNG 3: ĐỘ NÉN SQUEEZE (BB) - Max 2.0đ ---
+        if last['bb_width'] < 0.12: score += 2.0; logs.append("💎 Nén chặt (Squeeze)")
+        elif last['close'] > last['ma20']: score += 1.0; logs.append("🏠 Trên MA20")
 
-        # --- D. Khối lượng & Gia tốc Vol (Max 2.0đ) ---
-        # Ước tính Vol cuối ngày nếu đang trong phiên
+        # --- TẦNG 4: KHỐI LƯỢNG (Dự báo Vol trong phiên) ---
         now = datetime.now()
+        # Tính tỷ lệ thời gian đã qua trong phiên (Loại trừ giờ nghỉ trưa)
         if 9 <= now.hour < 15:
-            minutes_passed = (now.hour - 9) * 60 + now.minute - 15
-            minutes_passed = max(minutes_passed, 1)
-            projected_vol = (last['volume'] / minutes_passed) * 240
+            if now.hour < 12: mins = (now.hour - 9) * 60 + now.minute - 15
+            else: mins = 135 + (now.hour - 13) * 60 + now.minute
+            mins = max(mins, 1)
+            projected_vol = (last['volume'] / mins) * 240
             vol_ratio = projected_vol / last['vma20'] if last['vma20'] > 0 else 0
         else:
             vol_ratio = last['volume'] / last['vma20'] if last['vma20'] > 0 else 0
@@ -105,65 +104,78 @@ class UltimateBossEngine:
         if vol_ratio > 1.3: score += 2.0; logs.append(f"📊 Nổ Vol (x{round(vol_ratio,1)})")
         elif vol_ratio > 0.9: score += 1.0; logs.append("Vol ổn định")
 
-        # --- E. Kiểm tra áp lực bán (Price Action) ---
+        # --- BỘ LỌC RỦI RO (Price Action) ---
         upper_wick = last['high'] - max(last['close'], last['open'])
-        body_size = abs(last['close'] - last['open'])
-        is_pressured = upper_wick > (body_size * 0.6) # Râu nến dài
+        body = abs(last['close'] - last['open'])
+        is_trap = upper_wick > (body * 0.6) and last['close'] < last['high']
 
         return {
-            "score": round(score, 1),
-            "logs": " | ".join(logs),
-            "price": last['close'],
-            "vol_ratio": round(vol_ratio, 2),
-            "is_pressured": is_pressured
+            "symbol": self.symbol, "score": round(score, 1), "price": last['close'],
+            "vol_ratio": round(vol_ratio, 1), "logs": " | ".join(logs), "is_trap": is_trap
         }
 
 # ==========================================
-# 3. HÀM CHẠY TỔNG HỢP & BÁO CÁO
+# 3. BỘ LỌC TIN TỨC (SAFETY CHECK)
 # ==========================================
-def run_ultimate_boss():
+def check_news(symbol):
+    try:
+        news = stock.stock_news(symbol=symbol)
+        if news.empty: return "✅ Sạch", 0
+        blacklist = ['bị bắt', 'vi phạm', 'đình chỉ', 'thanh tra', 'khởi tố', 'hủy niêm yết']
+        for title in news['title'].head(3):
+            if any(word in title.lower() for word in blacklist): return "❌ XẤU", -5
+        return "✅ Sạch", 0
+    except: return "➖ Không rõ", 0
+
+# ==========================================
+# 4. QUY TRÌNH VẬN HÀNH (MAIN WORKER)
+# ==========================================
+def main_worker():
     now = datetime.now()
-    # Kiểm tra xem có phải lúc tổng kết cuối ngày không (Sau 14:45)
     is_summary_time = (now.hour == 14 and now.minute >= 45) or (now.hour >= 15)
     
     all_results = []
-    bot.send_message(CHAT_ID, f"🔄 **BOSS BẮT ĐẦU QUÉT {len(WATCHLIST)} MÃ...**")
+    bot.send_message(CHAT_ID, f"🚀 **BOSS V10 BẮT ĐẦU QUÉT {len(WATCHLIST)} MÃ...**")
 
     for symbol in WATCHLIST:
         try:
-            # Lấy dữ liệu Intraday từ VCI (độ trễ thấp)
             df = stock.stock_historical_data(symbol=symbol, source='VCI', 
                                            start_date=(now - timedelta(days=60)).strftime('%Y-%m-%d'),
                                            end_date=now.strftime('%Y-%m-%d'))
             if df.empty or len(df) < 20: continue
             
-            engine = UltimateBossEngine(df, symbol)
-            res = engine.get_comprehensive_score()
-            res['symbol'] = symbol
+            boss = UltimateBoss(df, symbol)
+            res = boss.analyze()
+            
+            news_status, news_penalty = check_news(symbol)
+            res['score'] += news_penalty
+            res['news'] = news_status
             all_results.append(res)
 
-            # CẢNH BÁO TRONG PHIÊN: Chỉ báo kèo từ 8 điểm trở lên
-            if not is_summary_time and res['score'] >= 8.0:
-                p_icon = "⚠️" if res['is_pressured'] else "✅"
-                msg = (f"🚀 **PHÁT HIỆN ĐIỂM NỔ: {symbol}**\n"
+            # --- TRONG PHIÊN: BÁO KÈO ĐIỂM CAO (>= 7.5đ) ---
+            if not is_summary_time and res['score'] >= 7.5:
+                trap_icon = "⚠️" if res['is_trap'] else "✅"
+                msg = (f"🔥 **TÍN HIỆU NGON: {symbol}**\n"
                        f"🏆 Điểm: `{res['score']}/10` | Giá: {res['price']}\n"
-                       f"📊 Dự báo Vol: x{res['vol_ratio']} | {p_icon} Lực cầu\n"
+                       f"📊 Dự báo Vol: x{res['vol_ratio']} | {trap_icon} Lực cầu\n"
+                       f"📰 Tin tức: {res['news']}\n"
                        f"📝 {res['logs']}")
                 bot.send_message(CHAT_ID, msg)
             
-            time.sleep(0.5)
+            time.sleep(0.5) # Chống block API
         except: continue
 
-    # BÁO CÁO TỔNG KẾT CUỐI NGÀY
+    # --- CUỐI PHIÊN: VIẾT SỚ TỔNG KẾT ---
     if is_summary_time:
         all_results.sort(key=lambda x: x['score'], reverse=True)
-        report = "🏁 **BÁO CÁO SỨC MẠNH DÒNG TIỀN**\n━━━━━━━━━━━━━━\n"
+        report = f"🏁 **SỚ TỔNG KẾT NGÀY {now.strftime('%d/%m')}**\n━━━━━━━━━━━━━━\n"
         for i, item in enumerate(all_results[:10]):
             icon = "⭐" if i < 3 else "🔹"
-            report += f"{icon} **{item['symbol']}**: `{item['score']}đ` | x{item['vol_ratio']} Vol\n"
+            report += f"{icon} **{item['symbol']}**: `{item['score']}đ` | Vol x{item['vol_ratio']}\n"
         
-        report += "\n💡 *Lời khuyên: Top 3 đang có gia tốc tốt nhất, chú ý phiên mai!*"
+        report += "\n💡 *Lời khuyên: Tập trung soi kỹ Top 3 cho sáng mai!*"
         bot.send_message(CHAT_ID, report)
 
 if __name__ == "__main__":
-    run_ultimate_boss()                    
+    main_worker()    
+    
