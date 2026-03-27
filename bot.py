@@ -40,7 +40,28 @@ try:
 except Exception as e:
     print(f"Lỗi gửi tin nhắn Telegram: {e}")
     print(f"Lỗi {symbol}: {e}")
-WATCHLIST = ['VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB', 'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', 'PSI', 'IVS', 'TCI', 'WSS', 'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', 'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', 'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', 'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', 'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', 'GEG', 'NT2', 'HDG', 'TTA', 'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', 'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', 'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', 'TNG', 'MSH', 'GIL', 'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI']
+# 1. CẤU HÌNH HỆ THỐNG
+# ==========================================
+TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN'
+CHAT_ID = 'YOUR_CHAT_ID'
+bot = telebot.TeleBot(TOKEN)
+stock = Vnstock()
+
+# FULL DANH SÁCH 160 MÃ KHÔNG CẮT BỚT
+WATCHLIST = [
+    'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', # Chứng khoán
+    'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', # Thép
+    'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', # BĐS & KCN
+    'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', # Đầu tư công & Xây dựng
+    'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', # Năng lượng & Dầu khí
+    'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', # Hóa chất & Phân bón
+    'VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB', # Ngân hàng
+    'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', # Trụ & Bán lẻ & Công nghệ
+    'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', # Hàng không & Cảng biển
+    'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', # Thủy sản
+    'TNG', 'MSH', 'GIL', # Dệt may
+    'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI', 'GEG', 'NT2', 'TTA' # Nông nghiệp & Cao su & Điện
+]
 
 # ==========================================
 # 2. BỘ NÃO PHÂN TÍCH (BOSS ENGINE CORE)
@@ -49,7 +70,12 @@ class UltimateBoss:
     def __init__(self, df, symbol):
         self.df = df
         self.symbol = symbol
-        self._add_indicators()
+        self.success = False
+        try:
+            self._add_indicators()
+            self.success = True
+        except Exception as e:
+            print(f"Lỗi tính toán chỉ báo mã {symbol}: {e}")
 
     def _add_indicators(self):
         # Xu hướng & Nền giá
@@ -65,117 +91,171 @@ class UltimateBoss:
         self.df['hist'] = macd['MACDh_12_26_9']
         self.df['hist_slope'] = self.df['hist'].diff()
         
-        # MCDX Hybrid (Dòng tiền Cá mập)
+        # MCDX Hybrid (Dòng tiền Cá mập) - Thêm fillna để tránh lỗi NaN
         mfi = ta.mfi(self.df['high'], self.df['low'], self.df['close'], self.df['volume'], length=14)
-        low_20, high_20 = self.df['low'].rolling(20).min(), self.df['high'].rolling(20).max()
-        banker_raw = ((self.df['close'] - low_20) / (high_20 - low_20) * 100).rolling(3).mean()
-        self.df['banker'] = (banker_raw * 0.4) + (mfi * 0.6)
+        low_20 = self.df['low'].rolling(20).min()
+        high_20 = self.df['high'].rolling(20).max()
+        
+        # Ngăn lỗi chia cho 0 nếu high_20 == low_20
+        diff = high_20 - low_20
+        diff = diff.replace(0, 0.0001)
+        
+        banker_raw = ((self.df['close'] - low_20) / diff * 100).rolling(3).mean()
+        self.df['banker'] = (banker_raw * 0.4) + (mfi.fillna(0) * 0.6)
+        
+        # Xóa các dòng NaN để không lỗi index
+        self.df.dropna(subset=['ma20', 'vma20', 'bb_width', 'hist', 'banker'], inplace=True)
 
     def analyze(self):
-        last, prev = self.df.iloc[-1], self.df.iloc[-2]
-        score, logs = 0, []
+        if not self.success or len(self.df) < 3:
+            return None
 
-        # --- TẦNG 1: DÒNG TIỀN MỒI (MCDX) - Max 3.5đ ---
+        last = self.df.iloc[-1]
+        prev = self.df.iloc[-2]
+        score = 0
+        logs = []
+
+        # --- TẦNG 1: DÒNG TIỀN MỒI ---
         if last['banker'] > 15:
-            score += 2.0; logs.append(f"Tiền mồi ({round(last['banker'])}%)")
-            if last['banker'] > prev['banker']: score += 1.5; logs.append("🔥 Tiền nạp thêm")
+            score += 2.0
+            logs.append(f"Tiền mồi ({round(last['banker'])}%)")
+            if last['banker'] > prev['banker']: 
+                score += 1.5
+                logs.append("Tiền nạp thêm")
 
-        # --- TẦNG 2: GIA TỐC HỒI PHỤC (MACD) - Max 2.5đ ---
+        # --- TẦNG 2: GIA TỐC MACD ---
         if last['hist_slope'] > 0:
-            score += 1.5; logs.append("🚀 MACD hướng lên")
-            if last['hist'] > 0: score += 1.0; logs.append("Xung lực mạnh")
+            score += 1.5
+            logs.append("MACD hướng lên")
+            if last['hist'] > 0: 
+                score += 1.0
+                logs.append("Xung lực mạnh")
 
-        # --- TẦNG 3: ĐỘ NÉN SQUEEZE (BB) - Max 2.0đ ---
-        if last['bb_width'] < 0.12: score += 2.0; logs.append("💎 Nén chặt (Squeeze)")
-        elif last['close'] > last['ma20']: score += 1.0; logs.append("🏠 Trên MA20")
+        # --- TẦNG 3: ĐỘ NÉN SQUEEZE ---
+        if last['bb_width'] < 0.12: 
+            score += 2.0
+            logs.append("Nén chặt")
+        elif last['close'] > last['ma20']: 
+            score += 1.0
+            logs.append("Trên MA20")
 
-        # --- TẦNG 4: KHỐI LƯỢNG (Dự báo Vol trong phiên) ---
+        # --- TẦNG 4: KHỐI LƯỢNG ---
         now = datetime.now()
-        # Tính tỷ lệ thời gian đã qua trong phiên (Loại trừ giờ nghỉ trưa)
-        if 9 <= now.hour < 15:
-            if now.hour < 12: mins = (now.hour - 9) * 60 + now.minute - 15
-            else: mins = 135 + (now.hour - 13) * 60 + now.minute
-            mins = max(mins, 1)
-            projected_vol = (last['volume'] / mins) * 240
-            vol_ratio = projected_vol / last['vma20'] if last['vma20'] > 0 else 0
-        else:
-            vol_ratio = last['volume'] / last['vma20'] if last['vma20'] > 0 else 0
+        vol_ratio = 0
+        if last['vma20'] > 0:
+            if 9 <= now.hour < 15:
+                # Tính số phút đã trôi qua
+                if now.hour < 12: 
+                    mins = (now.hour - 9) * 60 + now.minute - 15
+                else: 
+                    mins = 135 + (now.hour - 13) * 60 + now.minute
+                mins = max(mins, 1)
+                projected_vol = (last['volume'] / mins) * 240
+                vol_ratio = projected_vol / last['vma20']
+            else:
+                vol_ratio = last['volume'] / last['vma20']
 
-        if vol_ratio > 1.3: score += 2.0; logs.append(f"📊 Nổ Vol (x{round(vol_ratio,1)})")
-        elif vol_ratio > 0.9: score += 1.0; logs.append("Vol ổn định")
+        if vol_ratio > 1.3: 
+            score += 2.0
+            logs.append(f"Nổ Vol (x{round(vol_ratio,1)})")
+        elif vol_ratio > 0.9: 
+            score += 1.0
+            logs.append("Vol ổn định")
 
-        # --- BỘ LỌC RỦI RO (Price Action) ---
+        # --- BỘ LỌC RỦI RO ---
         upper_wick = last['high'] - max(last['close'], last['open'])
         body = abs(last['close'] - last['open'])
-        is_trap = upper_wick > (body * 0.6) and last['close'] < last['high']
+        is_trap = (upper_wick > (body * 0.6)) and (last['close'] < last['high'])
 
         return {
-            "symbol": self.symbol, "score": round(score, 1), "price": last['close'],
-            "vol_ratio": round(vol_ratio, 1), "logs": " | ".join(logs), "is_trap": is_trap
+            "symbol": self.symbol, 
+            "score": round(score, 1), 
+            "price": last['close'],
+            "vol_ratio": round(vol_ratio, 1), 
+            "logs": " | ".join(logs), 
+            "is_trap": is_trap
         }
 
 # ==========================================
-# 3. BỘ LỌC TIN TỨC (SAFETY CHECK)
+# 3. QUY TRÌNH VẬN HÀNH CHÍNH
 # ==========================================
-def check_news(symbol):
+def send_telegram_msg(msg):
+    """Hàm gửi tin nhắn an toàn, chống lỗi parse Markdown"""
     try:
-        news = stock.stock_news(symbol=symbol)
-        if news.empty: return "✅ Sạch", 0
-        blacklist = ['bị bắt', 'vi phạm', 'đình chỉ', 'thanh tra', 'khởi tố', 'hủy niêm yết']
-        for title in news['title'].head(3):
-            if any(word in title.lower() for word in blacklist): return "❌ XẤU", -5
-        return "✅ Sạch", 0
-    except: return "➖ Không rõ", 0
+        # Không dùng parse_mode="Markdown" để tránh bị lỗi vỡ font làm sập Bot
+        bot.send_message(CHAT_ID, msg)
+    except Exception as e:
+        print(f"Lỗi gửi Telegram: {e}")
 
-# ==========================================
-# 4. QUY TRÌNH VẬN HÀNH (MAIN WORKER)
-# ==========================================
 def main_worker():
     now = datetime.now()
-    is_summary_time = (now.hour == 14 and now.minute >= 45) or (now.hour >= 15)
+    is_summary_time = (now.hour == 14 and now.minute >= 45) or (now.hour >= 15) or (now.hour < 8) # Bao gồm cả buổi tối
     
     all_results = []
-    bot.send_message(CHAT_ID, f"🚀 **BOSS V10 BẮT ĐẦU QUÉT {len(WATCHLIST)} MÃ...**")
+    total_symbols = len(WATCHLIST)
+    
+    send_telegram_msg(f"🚀 BOSS V10.1 BẮT ĐẦU QUÉT {total_symbols} MÃ...")
+    
+    start_date = (now - timedelta(days=90)).strftime('%Y-%m-%d')
+    end_date = now.strftime('%Y-%m-%d')
 
-    for symbol in WATCHLIST:
+    for i, symbol in enumerate(WATCHLIST):
+        # In tiến độ ra console (nếu chạy trên GitHub Actions sẽ dễ debug)
+        print(f"Đang quét {i+1}/{total_symbols}: {symbol}...")
+        
+        df = pd.DataFrame()
+        # Tách riêng block try-except cho Data Fetching
         try:
-            df = stock.stock_historical_data(symbol=symbol, source='VCI', 
-                                           start_date=(now - timedelta(days=60)).strftime('%Y-%m-%d'),
-                                           end_date=now.strftime('%Y-%m-%d'))
-            if df.empty or len(df) < 20: continue
+            df = stock.stock_historical_data(symbol=symbol, source='TCB', start_date=start_date, end_date=end_date)
+            # Chuyển đổi tên cột cho đồng nhất (đề phòng API đổi format)
+            df.rename(columns=lambda x: x.lower(), inplace=True)
+        except Exception as e:
+            print(f"Lỗi lấy dữ liệu {symbol}: {e}")
+            continue
+
+        if df.empty or len(df) < 30:
+            print(f"Dữ liệu {symbol} quá ngắn hoặc trống.")
+            continue
             
-            boss = UltimateBoss(df, symbol)
-            res = boss.analyze()
-            
-            news_status, news_penalty = check_news(symbol)
-            res['score'] += news_penalty
-            res['news'] = news_status
+        # Tính toán và phân tích
+        boss = UltimateBoss(df, symbol)
+        res = boss.analyze()
+        
+        if res is not None:
             all_results.append(res)
-
-            # --- TRONG PHIÊN: BÁO KÈO ĐIỂM CAO (>= 7.5đ) ---
-            if not is_summary_time and res['score'] >= 7.5:
-                trap_icon = "⚠️" if res['is_trap'] else "✅"
-                msg = (f"🔥 **TÍN HIỆU NGON: {symbol}**\n"
-                       f"🏆 Điểm: `{res['score']}/10` | Giá: {res['price']}\n"
-                       f"📊 Dự báo Vol: x{res['vol_ratio']} | {trap_icon} Lực cầu\n"
-                       f"📰 Tin tức: {res['news']}\n"
-                       f"📝 {res['logs']}")
-                bot.send_message(CHAT_ID, msg)
             
-            time.sleep(0.5) # Chống block API
-        except: continue
+            # BÁO TRONG PHIÊN (Chỉ báo nếu điểm >= 7.5 và đang trong giờ giao dịch)
+            if not is_summary_time and res['score'] >= 7.5:
+                trap = "CẨN THẬN RÂU NẾN!" if res['is_trap'] else "Lực cầu Tốt"
+                msg = (f"🔥 TÍN HIỆU NGON: {symbol}\n"
+                       f"- Điểm: {res['score']}/10\n"
+                       f"- Giá: {res['price']}\n"
+                       f"- Vol dự báo: x{res['vol_ratio']} | {trap}\n"
+                       f"- Dấu hiệu: {res['logs']}")
+                send_telegram_msg(msg)
+        
+        time.sleep(0.5) # Nghỉ nửa giây tránh Rate Limit
 
-    # --- CUỐI PHIÊN: VIẾT SỚ TỔNG KẾT ---
+    # BÁO CÁO TỔNG KẾT
     if is_summary_time:
+        if len(all_results) == 0:
+            send_telegram_msg("⚠️ Lỗi: Không quét được dữ liệu của bất kỳ mã nào! Hãy kiểm tra lại API vnstock.")
+            return
+
         all_results.sort(key=lambda x: x['score'], reverse=True)
-        report = f"🏁 **SỚ TỔNG KẾT NGÀY {now.strftime('%d/%m')}**\n━━━━━━━━━━━━━━\n"
+        
+        report = f"🏁 SỚ TỔNG KẾT NGÀY {now.strftime('%d/%m')}\n"
+        report += "━━━━━━━━━━━━━━\n"
+        
         for i, item in enumerate(all_results[:10]):
             icon = "⭐" if i < 3 else "🔹"
-            report += f"{icon} **{item['symbol']}**: `{item['score']}đ` | Vol x{item['vol_ratio']}\n"
+            report += f"{icon} {item['symbol']}: {item['score']}đ | Vol x{item['vol_ratio']}\n"
         
-        report += "\n💡 *Lời khuyên: Tập trung soi kỹ Top 3 cho sáng mai!*"
-        bot.send_message(CHAT_ID, report)
+        report += "\n💡 Lời khuyên: Tập trung soi kỹ Top 3 cho sáng mai!"
+        send_telegram_msg(report)
+    else:
+        send_telegram_msg(f"✅ Đã quét xong {total_symbols} mã. Tìm thấy {len([x for x in all_results if x['score'] >= 7.5])} cơ hội.")
 
 if __name__ == "__main__":
-    main_worker()    
-    
+    main_worker()
+        
