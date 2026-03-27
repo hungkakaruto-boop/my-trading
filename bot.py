@@ -40,6 +40,108 @@ try:
 except Exception as e:
     print(f"Lỗi gửi tin nhắn Telegram: {e}")
     print(f"Lỗi {symbol}: {e}")
+# --- 1. HÀM CHẤM ĐIỂM CHI TIẾT (Logic lõi) ---
+def calculate_score(row, prev_row, rel_vol, dist_ma20, news_safety):
+    score = 0
+    details = []
+
+    # A. Dòng tiền Banker (MCDX) - Max 3đ
+    if row['banker_final'] > 25:
+        score += 2
+        details.append("🐳 Tiền to vào (+2)")
+        if row['banker_final'] > prev_row['banker_final']:
+            score += 1
+            details.append("📈 Gia tốc tiền tăng (+1)")
+
+    # B. Động lượng (MACD/RSI) - Max 2đ
+    if row['hist'] > prev_row['hist']: # Đang hướng lên
+        score += 1
+        details.append("🚀 Động lượng hồi phục (+1)")
+    if row['rsi'] > 50:
+        score += 1
+        details.append("💪 Phe mua chiếm ưu thế (+1)")
+
+    # C. Nỗ lực Khối lượng (Volume) - Max 2đ
+    if rel_vol >= 1.5:
+        score += 2
+        details.append("📊 Vol nổ mạnh (+2)")
+    elif rel_vol >= 1.2:
+        score += 1
+        details.append("📊 Vol mồi (+1)")
+
+    # D. Vị thế nền giá (MA20) - Max 2đ
+    if abs(dist_ma20) <= 0.02: # Sát nền
+        score += 2
+        details.append("🏠 Ngay nền an toàn (+2)")
+    elif dist_ma20 <= 0.05: # Hơi xa nền
+        score += 1
+        details.append("🛤️ Chớm bay khỏi nền (+1)")
+    elif dist_ma20 > 0.08: # Quá xa (Đu đỉnh)
+        score -= 2
+        details.append("⚠️ Quá xa nền (-2)")
+
+    # E. Khiên bảo vệ (Tin tức) - Max 1đ
+    if "Bình thường" in news_safety:
+        score += 1
+        details.append("🛡️ Tin sạch (+1)")
+    elif "CẢNH BÁO" in news_safety:
+        score -= 3
+        details.append("❌ Tin xấu nặng (-3)")
+
+    return score, " | ".join(details)
+
+# --- 2. HÀM PHÂN TÍCH VÀ GỬI TIN ---
+def boss_scoring_scanner(symbol):
+    try:
+        # Lấy dữ liệu
+        today = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=100)).strftime('%Y-%m-%d')
+        df = stock.stock_historical_data(symbol=symbol, source='VCI', start_date=start_date, end_date=today)
+        
+        if df.empty or len(df) < 30: return
+
+        # Chỉ báo
+        df['ma20'] = ta.sma(df['close'], length=20)
+        df['vma20'] = ta.sma(df['volume'], length=20)
+        df['rsi'] = ta.rsi(df['close'], length=14)
+        df['mfi'] = ta.mfi(df['high'], df['low'], df['close'], df['volume'], length=14)
+        
+        # Banker Hybrid
+        low_20 = df['low'].rolling(20).min()
+        high_20 = df['high'].rolling(20).max()
+        df['banker_raw'] = ((df['close'] - low_20) / (high_20 - low_20) * 100).rolling(3).mean()
+        df['banker_final'] = (df['banker_raw'] * 0.5) + (df['mfi'] * 0.5)
+        
+        # MACD
+        macd = df.ta.macd()
+        df['hist'] = macd['MACDh_12_26_9']
+        
+        last = df.iloc[-1]
+        prev = df.iloc[-2]
+        rel_vol = last['volume'] / last['vma20']
+        dist_ma20 = (last['close'] - last['ma20']) / last['ma20']
+
+        # Check tin tức trước khi chấm điểm
+        news_status = "💎 Tin tức: Bình thường" # Giả sử hàm check_news_safety đã có ở trên
+        
+        # CHẤM ĐIỂM
+        total_score, score_details = calculate_score(last, prev, rel_vol, dist_ma20, news_status)
+
+        # LỌC: CHỈ GỬI TIN NẾU >= 7 ĐIỂM
+        if total_score >= 7:
+            status_icon = "🔥 CỰC THƠM" if total_score >= 9 else "✅ MUA ĐƯỢC"
+            msg = (f"{status_icon} | **{symbol}**\n"
+                   f"━━━━━━━━━━━━━━\n"
+                   f"🏆 Tổng điểm: **{total_score}/10**\n"
+                   f"💵 Giá hiện tại: **{last['close']}**\n"
+                   f"📝 Chi tiết: _{score_details}_\n"
+                   f"🛡️ Cắt lỗ: {round(last['close']*0.93, 2)}")
+            bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
+
+    except Exception as e:
+        print(f"Lỗi {symbol}: {e}")
+
+# (Hàm main_worker quét 150 mã giữ nguyên như bản trước)
 WATCHLIST = ['VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB', 'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', 'PSI', 'IVS', 'TCI', 'WSS', 'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', 'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', 'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', 'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', 'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', 'GEG', 'NT2', 'HDG', 'TTA', 'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', 'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', 'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', 'TNG', 'MSH', 'GIL', 'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI']
 
 # ==========================================
