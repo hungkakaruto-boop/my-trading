@@ -43,94 +43,118 @@ except Exception as e:
 WATCHLIST = ['VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB', 'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', 'PSI', 'IVS', 'TCI', 'WSS', 'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', 'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', 'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', 'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', 'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', 'GEG', 'NT2', 'HDG', 'TTA', 'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', 'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', 'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', 'TNG', 'MSH', 'GIL', 'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI']
 
 # ==========================================
-# 2. BỘ LỌC TIN TỨC (QUÉT BLACKLIST)
+# 2. BỘ LỌC TIN TỨC (News Safety)
 # ==========================================
 def check_news_safety(symbol):
     try:
-        news_df = stock_news(symbol)
+        # Giả sử hàm lấy tin tức từ vnstock
+        news_df = stock.stock_news(symbol=symbol)
         if news_df.empty: return "💎 Tin tức: Ổn định"
         
-        blacklist = ['bị bắt', 'vi phạm', 'đình chỉ', 'thua lỗ', 'cắt margin', 'cảnh báo', 'hủy niêm yết', 'thanh tra', 'khởi tố']
+        blacklist = ['bị bắt', 'vi phạm', 'đình chỉ', 'thua lỗ', 'cắt margin', 'cảnh báo', 'hủy niêm yết', 'thanh tra', 'khởi tố', 'nợ thuế']
         latest_titles = news_df['title'].head(3).tolist()
         for title in latest_titles:
             for word in blacklist:
                 if word in title.lower():
-                    return f"⚠️ CẢNH BÁO: {title[:40]}..."
+                    return f"⚠️ CẢNH BÁO: {title[:45]}..."
         return "💎 Tin tức: Bình thường"
     except: return "🔍 Tin tức: Không có dữ liệu"
 
 # ==========================================
-# 3. LOGIC SMART-MCDX (NHẬY CẢ XANH LẪN ĐỎ)
+# 3. LÕI PHÂN TÍCH ULTIMATE (KẾT HỢP CŨ & MỚI)
 # ==========================================
-def analyze_ultimate(symbol):
+def analyze_ultimate_boss(symbol):
     try:
-        df = stock_historical_data(symbol, "2024-01-01", datetime.now().strftime('%Y-%m-%d'), "1D")
-        if df.empty or len(df) < 50: return None
+        today = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=100)).strftime('%Y-%m-%d')
+        df = stock.stock_historical_data(symbol=symbol, source='VCI', start_date=start_date, end_date=today)
+        
+        if df.empty or len(df) < 35: return None
 
-        # Tính toán Banker mô phỏng chuẩn (Nhạy hơn RSI cũ)
+        # --- A. Chỉ báo cơ bản ---
+        df['ma20'] = ta.sma(df['close'], length=20)
+        df['vma20'] = ta.sma(df['volume'], length=20)
+        df['rsi'] = ta.rsi(df['close'], length=13)
+        df['mfi'] = ta.mfi(df['high'], df['low'], df['close'], df['volume'], length=14)
+        
+        # --- B. Banker Hybrid (Công thức cải tiến của bạn + tôi) ---
         low_20 = df['low'].rolling(20).min()
         high_20 = df['high'].rolling(20).max()
-        df['banker'] = ((df['close'] - low_20) / (high_20 - low_20) * 100).rolling(3).mean()
-
-        df['rsi'] = ta.rsi(df['close'], length=13)
-        df['vol_avg'] = df['volume'].rolling(window=20).mean()
+        df['banker_raw'] = ((df['close'] - low_20) / (high_20 - low_20) * 100).rolling(3).mean()
+        # Mix với MFI để xác nhận tiền thật
+        df['banker_final'] = (df['banker_raw'] * 0.5) + (df['mfi'] * 0.5)
+        
+        # --- C. MACD Gia tốc ---
+        macd = df.ta.macd(fast=12, slow=26, signal=9)
+        df['hist'] = macd['MACDh_12_26_9']
         
         last = df.iloc[-1]
         prev = df.iloc[-2]
-        rel_vol = last['volume'] / last['vol_avg']
+        rel_vol = last['volume'] / last['vma20']
+        dist_ma20 = (last['close'] - last['ma20']) / last['ma20']
 
-        # 1. Lọc cổ phiếu rác (Thanh khoản thấp)
-        if last['volume'] * last['close'] < 1000000: return None
+        # --- D. BỘ LỌC CHIẾN THUẬT ---
+        
+        # 1. Thanh khoản tối thiểu (> 1 tỷ VNĐ)
+        if last['volume'] * last['close'] < 1000000000: return None
 
-        # 2. Chiến thuật "Bắt Cá Hồi" (Xanh vẫn mua - Hồi từ đáy)
-        is_catching_fish = (prev['rsi'] < 35) and (last['rsi'] > prev['rsi']) and (last['close'] > last['open'])
+        # 2. Chiến thuật 1: BẮT CÁ HỒI (Hồi từ đáy RSI)
+        is_catching_fish = (prev['rsi'] < 35) and (last['rsi'] > prev['rsi']) and (last['close'] > last['open']) and (rel_vol > 1.1)
 
-        # 3. Chiến thuật "Bùng Nổ" (Đã có dòng tiền đỏ xác nhận)
+        # 3. Chiến thuật 2: BÙNG NỔ (Xác nhận nổ)
         high_10 = df['high'].shift(1).rolling(10).max().iloc[-1]
-        is_explosion = (last['banker'] > 25) and (last['close'] > high_10)
+        is_explosion = (last['banker_final'] > 30) and (last['close'] > high_10) and (rel_vol > 1.3)
 
-        # QUYẾT ĐỊNH
-        if rel_vol > 1.2: # Volume tăng 20% so với trung bình
-            if is_catching_fish:
-                return {"type": "🌀 BẮT CÁ HỒI (Hồi từ đáy)", "price": last['close'], "banker": round(last['banker'], 1), "vol": round(rel_vol, 2)}
-            if is_explosion:
-                return {"type": "🚀 BÙNG NỔ (Dòng tiền vào)", "price": last['close'], "banker": round(last['banker'], 1), "vol": round(rel_vol, 2)}
-    except: return None
+        # 4. Chiến thuật 3: SĂN SỚM (MACD + MCDX Slope)
+        is_early = (last['hist'] < 0) and (last['hist'] > prev['hist']) and (df['hist'].iloc[-3] < prev['hist']) and (dist_ma20 < 0.03)
+
+        # PHÂN LOẠI TÍN HIỆU
+        if is_catching_fish:
+            return {"type": "🌀 BẮT CÁ HỒI (Hồi đáy)", "price": last['close'], "banker": round(last['banker_final'], 1), "vol": round(rel_vol, 2), "dist": round(dist_ma20*100, 2)}
+        if is_explosion:
+            return {"type": "🚀 BÙNG NỔ (Breakout)", "price": last['close'], "banker": round(last['banker_final'], 1), "vol": round(rel_vol, 2), "dist": round(dist_ma20*100, 2)}
+        if is_early:
+            return {"type": "🟢 SĂN SỚM (Tiền mồi)", "price": last['close'], "banker": round(last['banker_final'], 1), "vol": round(rel_vol, 2), "dist": round(dist_ma20*100, 2)}
+            
+    except Exception as e: return None
     return None
 
 # ==========================================
-# 4. VẬN HÀNH & GỬI TIN (CHỐNG LẶP)
+# 4. VẬN HÀNH CHÍNH
 # ==========================================
 def main_worker():
     start_time = datetime.now().strftime('%H:%M:%S')
-    status_msg = bot.send_message(CHAT_ID, f"🔄 **BẮT ĐẦU QUÉT THỊ TRƯỜNG**\n🕒 Lúc: {start_time}")
+    # Thông báo bắt đầu quét
+    status_msg = bot.send_message(CHAT_ID, f"🔄 **BOSS ĐANG QUÉT {len(WATCHLIST)} MÃ**\n🕒 Lúc: {start_time}")
     
     found_count = 0
     total = len(WATCHLIST)
     
     for index, symbol in enumerate(WATCHLIST):
-        if (index + 1) % 20 == 0 or (index + 1) == total:
-            try:
-                percent = round((index + 1) / total * 100)
-                bot.edit_message_text(f"📊 Đang quét: {index+1}/{total} mã ({percent}%)", CHAT_ID, status_msg.message_id)
+        # Cập nhật tiến độ mỗi 25 mã
+        if (index + 1) % 25 == 0:
+            percent = round((index + 1) / total * 100)
+            try: bot.edit_message_text(f"📊 Tiến độ Boss: {index+1}/{total} mã ({percent}%)", CHAT_ID, status_msg.message_id)
             except: pass
 
-        res = analyze_ultimate(symbol)
+        res = analyze_ultimate_boss(symbol)
         if res:
             found_count += 1
             news_txt = check_news_safety(symbol)
             msg = (f"💎 **MÃ TIỀM NĂNG: {symbol}**\n"
                    f"━━━━━━━━━━━━━━\n"
                    f"🎯 Tín hiệu: `{res['type']}`\n"
-                   f"💵 Giá mua: **{res['price']}**\n"
-                   f"🐳 Banker (Đỏ): `{res['banker']}%`\n"
+                   f"💵 Giá: **{res['price']}**\n"
+                   f"🐳 Banker (Hybrid): `{res['banker']}%`\n"
                    f"📊 Vol đột biến: x{res['vol']}\n"
+                   f"📏 Cách MA20: {res['dist']}% \n"
                    f"📰 {news_txt}\n"
-                   f"🛡️ Hỗ trợ (Cắt lỗ): {round(res['price'] * 0.93, 2)}")
+                   f"🛡️ Cắt lỗ (Gợi ý): {round(res['price'] * 0.94, 2)}")
             bot.send_message(CHAT_ID, msg)
-        time.sleep(0.6)
+        
+        time.sleep(0.5) # Tránh bị ban do request nhanh
 
-    bot.send_message(CHAT_ID, f"🏁 **HOÀN THÀNH!** Tìm thấy {found_count} mã tiềm năng.")
+    bot.send_message(CHAT_ID, f"🏁 **BOSS ĐÃ QUÉT XONG!**\n✅ Tìm thấy {found_count} mã thỏa mãn.")
 
 if __name__ == "__main__":
-    main_worker()
+    main_worker()        
