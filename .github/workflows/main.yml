@@ -25,7 +25,7 @@ jobs:
       - name: 3. Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install vnstock3 pandas_ta pandas numpy pyTelegramBotAPI pytz ipython
+          pip install vnstock pandas_ta pandas numpy pyTelegramBotAPI pytz ipython
 
       - name: 4. Execute Scanner
         env:
