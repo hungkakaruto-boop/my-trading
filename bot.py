@@ -39,162 +39,86 @@ try:
     bot.send_message(CHAT_ID, "🚀 Bot Scan Cổ Phiếu (FireAnt Data) đã bắt đầu chạy...")
 except Exception as e:
     print(f"Lỗi gửi tin nhắn Telegram: {e}")
+def get_150_watchlist():
+    """Tự động lấy 150 mã mạnh nhất thị trường (VN100 + HNX30 + Penny thanh khoản)"""
+    try:
+        vn100 = vnindex_constituent_compositions(index='VN100')['ticker'].tolist()
+        hnx30 = hnx30_constituent_compositions()['ticker'].tolist()
+        # Thêm các mã bạn quan tâm đặc biệt
+        fav = ['PC1', 'GEX', 'PDR', 'POW', 'SSI', 'VND', 'DIG', 'NLG', 'MVN', 'ACV']
+        full_list = list(set(vn100 + hnx30 + fav))
+        return full_list[:150]
+    except:
+        # Nếu lỗi API, dùng list cứng dự phòng
+        return ['SSI', 'VND', 'TCB', 'HDB', 'HPG', 'HSG', 'NKG', 'PDR', 'DIG', 'DXG', 'VHM', 'VIC', 'MSN', 'FPT', 'MWG']
 
 # ==========================================
-# 2. HÀM LẤY DỮ LIỆU TỪ FIREANT
+# 2. BỘ NÃO PHÂN TÍCH (LOGIC "THẦN THÁNH")
 # ==========================================
-def get_fireant_data(ticker, days=160):
-    """Hàm thay thế vnstock để lấy dữ liệu từ API của FireAnt"""
-    url = f"https://restv2.fireant.vn/symbols/{ticker}/historical-quotes"
-    now_vn = datetime.now(vn_tz)
-    
-    params = {
-        "startDate": (now_vn - timedelta(days=days)).strftime("%Y-%m-%d"),
-        "endDate": now_vn.strftime("%Y-%m-%d"),
-        "offset": 0,
-        "limit": days # Lấy tương đương số ngày
-    }
-    
+def analyze_god_mode(symbol):
     try:
-        # Nhịp nghỉ nhỏ để tránh bị FireAnt khóa IP vì Spam request
-        time.sleep(0.5) 
-        response = requests.get(url, params=params, headers=FIREANT_HEADERS, timeout=10)
+        # Lấy dữ liệu 100 phiên gần nhất
+        df = stock_historical_data(symbol, "2024-01-01", datetime.now().strftime('%Y-%m-%d'), "1D")
+        if len(df) < 50: return None
+
+        # --- CHỈ BÁO KỸ THUẬT ---
+        # 1. Giảm độ trễ cực thấp với Hull Moving Average
+        df['hma21'] = ta.hma(df['close'], length=21)
+        df['ema50'] = ta.ema(df['close'], length=50)
         
-        if response.status_code == 200:
-            df = pd.DataFrame(response.json())
-            if not df.empty:
-                # FireAnt trả về dữ liệu mới nhất ở trên cùng, cần đảo ngược lại từ cũ -> mới
-                df['date'] = pd.to_datetime(df['date'])
-                df = df.sort_values(by='date', ascending=True).reset_index(drop=True)
-                
-                # Đảm bảo tên cột khớp với logic cũ (chữ in thường)
-                df.rename(columns=lambda x: x.lower(), inplace=True)
-                
-                # Nếu FireAnt trả về tên cột khác, ép kiểu về chuẩn:
-                if 'priceclose' in df.columns: df.rename(columns={'priceclose': 'close'}, inplace=True)
-                if 'pricelow' in df.columns: df.rename(columns={'pricelow': 'low'}, inplace=True)
-                if 'dealvolume' in df.columns: df.rename(columns={'dealvolume': 'volume'}, inplace=True)
-                    
-                return df
-        return pd.DataFrame()
+        # 2. Chỉ báo MCDX (Dòng tiền Cá mập - Cột đỏ)
+        df['rsi'] = ta.rsi(df['close'], length=13)
+        df['banker'] = ((df['rsi'] - 30) * 2.5).clip(lower=0, upper=100)
+
+        # 3. Lọc nhiễu ADX (Chỉ đánh khi có trend rõ ràng)
+        adx_df = ta.adx(df['high'], df['low'], df['close'], length=14)
+        df['adx'] = adx_df['ADX_14']
+        
+        # 4. Đo lường Volume
+        df['vol_avg'] = df['volume'].rolling(window=20).mean()
+        
+        # --- LOGIC QUYẾT ĐỊNH ---
+        last = df.iloc[-1]
+        high_10 = df['high'].shift(1).rolling(window=10).max().iloc[-1]
+        
+        is_uptrend = (last['close'] > last['hma21']) and (last['hma21'] > last['ema50'])
+        
+        # KỊCH BẢN 1: MUA PULLBACK (Chạm hỗ trợ nảy lên - Giống MSN)
+        if is_uptrend and (last['low'] <= last['hma21']) and (last['close'] > last['hma21']) and (last['banker'] > 35):
+            return {"symbol": symbol, "type": "🔥 ĐIỂM MUA HỖ TRỢ (PULLBACK)", "price": last['close'], "banker": round(last['banker'], 1)}
+
+        # KỊCH BẢN 2: MUA BÙNG NỔ (Nổ Vol, Cá mập đẩy - Giống MVN)
+        if (last['close'] > high_10) and (last['banker'] > 55) and (last['volume'] > last['vol_avg'] * 1.3) and (last['adx'] > 25):
+            return {"symbol": symbol, "type": "🚀 ĐIỂM MUA BÙNG NỔ (BREAKOUT)", "price": last['close'], "banker": round(last['banker'], 1)}
+
     except Exception as e:
-        print(f"Lỗi lấy dữ liệu {ticker}: {e}")
-        return pd.DataFrame()
+        print(f"Lỗi {symbol}: {e}")
+    return None
 
 # ==========================================
-# 3. TÍNH TỶ LỆ VOLUME DỰ KIẾN
+# 3. ĐỊNH DẠNG TIN NHẮN & VẬN HÀNH
 # ==========================================
-def get_volume_projection_ratio():
-    now = datetime.now(vn_tz)
-    if now.hour < 9 or (now.hour == 9 and now.minute < 15): return 0.05
-    if now.hour >= 15: return 1.0
+def send_telegram(data):
+    msg = f"🔔 **TÍN HIỆU CHIẾN THUẬT: {data['symbol']}**\n"
+    msg += f"━━━━━━━━━━━━━━━━━━\n"
+    msg += f"📍 Trạng thái: **{data['type']}**\n"
+    msg += f"💰 Giá vào: **{data['price']}**\n"
+    msg += f"🐳 Cá mập (MCDX): `{data['banker']}%` đỏ\n"
+    msg += f"🛡️ Cắt lỗ: Thủng đường HMA21\n"
+    msg += f"━━━━━━━━━━━━━━━━━━\n"
+    msg += f"⚡ *Hành động: Múc quyết liệt, không kỳ kèo giá!*"
+    bot.send_message(CHAT_ID, msg, parse_mode='Markdown')
 
-    if now.hour < 12:
-        elapsed = (now.hour - 9) * 60 + now.minute - 15
-    else:
-        elapsed = 135 + (now.hour - 13) * 60 + now.minute
-    
-    elapsed = max(10, min(elapsed, 225))
-    return elapsed / 225
-
-# ==========================================
-# 4. LOGIC CHẤM ĐIỂM (GIỮ NGUYÊN BẢN GỐC)
-# ==========================================
-def calculate_signal_score(ticker, is_market_uptrend):
-    try:
-        # Thay thế vnstock bằng hàm lấy data của FireAnt
-        df = get_fireant_data(ticker, days=160)
-        
-        if df.empty or len(df) < 50: return None
-
-        df['MA20'] = ta.sma(df['close'], length=20)
-        df['Low_20'] = df['low'].rolling(window=20).min()
-        
-        curr = df.iloc[-1]
-        prev = df.iloc[-2]
-        avg_vol_20 = df['volume'].iloc[:-1].tail(20).mean()
-        
-        ratio = get_volume_projection_ratio()
-        projected_vol = curr['volume'] / ratio
-        vol_factor = projected_vol / avg_vol_20
-
-        score = 0
-        signal_type = ""
-
-        is_spring_zone = curr['low'] <= df['Low_20'].iloc[-2] * 1.01
-        if is_spring_zone and curr['close'] > prev['close']:
-            score += 65
-            if vol_factor < 1.1: 
-                score += 20
-                signal_type = "⚓ SPRING (CẠN CUNG)"
-            else:
-                score += 10
-                signal_type = "🌪 SHAKEOUT (HẤP THỤ)"
-
-        if curr['close'] > prev['close'] and vol_factor > 1.4:
-            score += 60
-            signal_type = "🔥 SOS (DÒNG TIỀN)"
-
-        if curr['close'] > curr['MA20']: score += 10
-        if not is_market_uptrend: score -= 20
-
-        if score >= 65:
-            chart_link = f"https://fireant.vn/dashboard/symbol/{ticker}"
-            return {'ticker': ticker, 'score': score, 'msg': f"Mẫu hình: **{signal_type}**\n📊 [Xem Chart]({chart_link})"}
-        return None
-    except: return None
-
-# ==========================================
-# 5. QUY TRÌNH QUÉT
-# ==========================================
-def main_scanner():
-    watch_list = [
-        "ACB","BID","CTG","FPT","GAS","GVR","HDB","HPG","MBB","MSN","MWG","PLX","POW","SAB","SHB","SSB","SSI","STB","TCB","TPB","VCB","VHM","VIB","VIC","VJC","VNM","VPB","VRE",
-        "VND","VCI","HCM","SHS","MBS","FTS","BSI","CTS","AGR","VIX","ORS","TVB","TVS","BVS",
-        "DIG","DXG","PDR","NVL","NLG","KDH","KBC","IDC","SZC","VGC","CEO","TCH","HQC","SCR","DXS","L14","HDG",
-        "HSG","NKG","VGS","SMC","TLH",
-        "VCG","LCG","HHV","CTD","PC1","C4G","FCN","HBC","REE","TV2",
-        "DGC","DCM","DPM","CSV","LAS","BFC",
-        "DGW","FRT","PNJ","PET","HAX",
-        "PVS","PVD","PVT","BSR","CNG","OIL",
-        "GMD","HAH","VSC","VOS",
-        "DBC","HAG","BAF","VHC","ANV","IDI","ASM","MPC","CMX",
-        "TNG","MSH","GIL","VGT","STK",
-        "VGI","CTR","FOX","TTN","GEG","NT2","QTP","BCG"
-    ]
-    watch_list = list(set(watch_list)) 
-
-    now_str = datetime.now(vn_tz).strftime("%H:%M")
-    
-    status_msg = bot.send_message(CHAT_ID, f"⏳ **[{now_str}]** Đang khởi động quét {len(watch_list)} mã cổ phiếu tiềm năng...")
-
-    # Kiểm tra VN-Index bằng FireAnt
-    try:
-        df_vn = get_fireant_data("VNINDEX", days=30)
-        is_market_uptrend = df_vn.iloc[-1]['close'] > ta.sma(df_vn['close'], length=20).iloc[-1]
-    except: 
-        is_market_uptrend = True
-
-    scored_list = []
-    
-    # GIẢM WORKERS XUỐNG 3 ĐỂ TRÁNH BỊ FIREANT CHẶN IP
-    with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
-        futures = [executor.submit(calculate_signal_score, t, is_market_uptrend) for t in watch_list]
-        for f in concurrent.futures.as_completed(futures):
-            res = f.result()
-            if res: scored_list.append(res)
-
-    try: bot.delete_message(CHAT_ID, status_msg.message_id)
-    except: pass
-
-    if scored_list:
-        scored_list.sort(key=lambda x: x['score'], reverse=True)
-        final_msg = f"🚀 **TÍN HIỆU REAL-TIME ({now_str})**\nVN-Index: {'✅ Thuận lợi' if is_market_uptrend else '⚠️ Rủi ro'}\n"
-        for item in scored_list:
-            final_msg += f"\n💎 **{item['ticker']}** (Điểm: {item['score']})\n{item['msg']}\n"
-        bot.send_message(CHAT_ID, final_msg, parse_mode="Markdown", disable_web_page_preview=True)
-    else:
-        bot.send_message(CHAT_ID, f"✅ **[{now_str}]** Quét xong! Hiện chưa có mã nào bùng nổ hoặc rũ bỏ đạt chuẩn.")
+def run_bot():
+    print(f"🌟 Bắt đầu truy quét 150 mã mạnh nhất thị trường...")
+    watchlist = get_150_watchlist()
+    for symbol in watchlist:
+        result = analyze_god_mode(symbol)
+        if result:
+            send_telegram(result)
+            print(f"✅ Đã bắn tín hiệu cho {symbol}")
+        time.sleep(0.5) # Tránh bị spam API
 
 if __name__ == "__main__":
-    main_scanner()        
+    run_bot()
+        
