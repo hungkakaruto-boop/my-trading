@@ -96,7 +96,7 @@ def analyze_ultimate(symbol):
         details = []
         
         # 1. Tiền to (MCDX) - Max 3đ
-        if last['banker_final'] > 25: 
+        if last['banker_final'] > 15: 
             score += 2; details.append("Tiền to vào")
             if last['banker_final'] > prev['banker_final']: score += 1; details.append("Tiền nạp thêm")
         
@@ -104,8 +104,8 @@ def analyze_ultimate(symbol):
         if last['hist'] > prev['hist'] > p_prev['hist']: score += 2; details.append("Đà hồi phục mạnh")
         
         # 3. Nỗ lực Volume - Max 2đ
-        if rel_vol >= 1.5: score += 2; details.append("Vol nổ")
-        elif rel_vol >= 1.1: score += 1; details.append("Vol mồi")
+        if rel_vol >= 1: score += 2; details.append("Vol nổ")
+        elif rel_vol >= 0.8: score += 1; details.append("Vol mồi")
         
         # 4. Vị thế MA20 - Max 2đ
         if abs(dist_ma20) <= 0.02: score += 2; details.append("Sát nền")
