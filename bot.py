@@ -6,7 +6,11 @@ import telebot
 import pytz
 from datetime import datetime, timedelta
 # Import bản vnstock3 mới nhất
-from vnstock3 import Vnstock
+from vnstock import Vnstock
+
+# ... (bên trong vòng lặp)
+stock_obj = Vnstock().stock(symbol=symbol, source='KBS') 
+df = stock_obj.quote.history(start=start_date, end=end_date, interval='1D')
 
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
