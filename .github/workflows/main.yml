@@ -4,35 +4,45 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-  schedule:
-    # Chạy mỗi 10 phút (*/10) 
-    # Từ giờ thứ 2 đến hết giờ thứ 7 UTC (9h sáng - 14h55 VN)
-    # Từ thứ 2 đến thứ 6 (1-5)
-    - cron: '*/10 2,3,4,5,6,7 * * 1-5'
-    # Chạy thêm các phút đầu giờ thứ 8 UTC để chốt phiên (15h - 15h15 VN)
-    - cron: '0,5,10,15 8 * * 1-5'
+schedule:
+    - cron: '15 2 * * 1-5'  # 9h15 sáng (Giờ VN) từ Thứ 2 đến Thứ 6
+    - cron: '15 7 * * 1-5'  # 14h15 chiều (Giờ VN) từ Thứ 2 đến Thứ 6
+  workflow_dispatch:        # Cho phép bạn nhấn nút "Run workflow" bằng tay
+
+# 2. QUAN TRỌNG NHẤT: Chế độ chống chạy đè (Concurrency)
+# Nếu bạn lỡ tay bấm Run 2 lần, nó sẽ tự hủy cái cũ để tránh lặp tin nhắn
+concurrency:
+  group: stock-bot-group
+  cancel-in-progress: true
+
 jobs:
   run-bot:
     runs-on: ubuntu-latest
+    
     steps:
+      # Bước 1: Lấy code từ kho lưu trữ về máy ảo
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Python 3.12
+      # Bước 2: Cài đặt Python phiên bản ổn định
+      - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12' # Bắt buộc dùng 3.12 để khớp với pandas-ta
+          python-version: '3.10'
+          cache: 'pip' # Tăng tốc độ cài đặt cho lần sau
 
-      - name: Install Libs
+      # Bước 3: Cài đặt các thư viện cần thiết
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install setuptools wheel
-          # Cài các thư viện chính từ nguồn ổn định nhất
-          pip install pandas pyTelegramBotAPI vnstock
-          # Cài pandas-ta bản mới nhất phù hợp với Python 3.12
-          pip install pandas-ta
+          pip install pandas pandas_ta vnstock pyTelegramBotAPI
 
+      # Bước 4: Chạy Bot
       - name: Execute Scanner
+        env:
+          # Đảm bảo log xuất hiện ngay lập tức để theo dõi
+          PYTHONUNBUFFERED: 1
+        run: python bot.py
         env:
           TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
           TELEGRAM_CHAT_ID: ${{'1736294695'}}
