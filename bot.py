@@ -1,13 +1,11 @@
 import os
-import time
-import pytz
 import pandas as pd
 import pandas_ta as ta
+import numpy as np
+import time
 import telebot
-from vnstock import *
-import datetime
 from datetime import datetime, timedelta
-import concurrent.futures
+from vnstock3 import Vnstock
 
 # ĐỊNH NGHĨA BIẾN vn_tz TRƯỚC KHI SỬ DỤNG
 vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
