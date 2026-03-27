@@ -92,17 +92,29 @@ def analyze_ultimate(symbol):
     return None
 
 # ==========================================
-# 3. VẬN HÀNH
+# ==========================================
+# 3. VẬN HÀNH & CẬP NHẬT TIẾN TRÌNH (BẢN CHỐNG LẶP)
 # ==========================================
 def main_worker():
     start_time = datetime.now()
+    # Gửi tin nhắn bắt đầu
     bot.send_message(CHAT_ID, f"🔄 **BOT BẮT ĐẦU QUÉT 150 MÃ**\n🕒 Lúc: {start_time.strftime('%H:%M:%S')}")
+    
+    # Tạo một tin nhắn "Tiến trình" duy nhất để cập nhật
+    progress_msg = bot.send_message(CHAT_ID, "⏳ Đang khởi tạo bộ quét...")
     
     found_count = 0
     for index, symbol in enumerate(WATCHLIST):
-        # Thông báo tiến trình mỗi 50 mã
-        if (index + 1) % 50 == 0:
-            bot.send_message(CHAT_ID, f"⏳ Đã quét: {index + 1}/150 mã...")
+        # Cập nhật tiến trình sau mỗi 10 mã (Sửa tin nhắn cũ, không gửi tin mới)
+        if (index + 1) % 10 == 0:
+            try:
+                bot.edit_message_text(
+                    chat_id=CHAT_ID,
+                    message_id=progress_msg.message_id,
+                    text=f"⏳ Tiến độ: {index + 1}/150 mã ({round((index+1)/150*100)}%)"
+                )
+            except:
+                pass # Tránh lỗi nếu Telegram không cho sửa nhanh quá
 
         result = analyze_ultimate(symbol)
         if result:
@@ -112,13 +124,14 @@ def main_worker():
             msg += f"🏅 Chiến thuật: `{result['type']}`\n"
             msg += f"💵 Giá mua: **{result['price']}**\n"
             msg += f"🐳 Cá mập: `{result['banker']}%` đỏ\n"
-            msg += f"━━━━━━━━━━━━━━\n"
+            msg += f"━━━━━━━━━━━━━━"
             bot.send_message(CHAT_ID, msg, parse_mode='Markdown')
         
-        time.sleep(0.6)
+        time.sleep(0.7) # Tăng nhẹ thời gian nghỉ để không bị spam API
 
-    bot.send_message(CHAT_ID, f"🏁 **HOÀN THÀNH**\n🔍 Tìm thấy: {found_count} cơ hội.")
-
+    # Xóa tin nhắn tiến trình khi xong và báo kết thúc
+    bot.delete_message(CHAT_ID, progress_msg.message_id)
+    bot.send_message(CHAT_ID, f"🏁 **HOÀN THÀNH QUÉT**\n🔍 Tìm thấy: {found_count} cơ hội.")
 if __name__ == "__main__":
     main_worker()
         
