@@ -46,7 +46,7 @@ def calculate_score(row, prev_row, rel_vol, dist_ma20, news_safety):
     details = []
 
     # A. Dòng tiền Banker (MCDX) - Max 3đ
-    if row['banker_final'] > 25:
+    if row['banker_final'] > 15:
         score += 2
         details.append("🐳 Tiền to vào (+2)")
         if row['banker_final'] > prev_row['banker_final']:
@@ -62,7 +62,7 @@ def calculate_score(row, prev_row, rel_vol, dist_ma20, news_safety):
         details.append("💪 Phe mua chiếm ưu thế (+1)")
 
     # C. Nỗ lực Khối lượng (Volume) - Max 2đ
-    if rel_vol >= 1.5:
+    if rel_vol >= 1:
         score += 2
         details.append("📊 Vol nổ mạnh (+2)")
     elif rel_vol >= 1.2:
@@ -136,7 +136,7 @@ def boss_scoring_scanner(symbol):
                    f"💵 Giá hiện tại: **{last['close']}**\n"
                    f"📝 Chi tiết: _{score_details}_\n"
                    f"🛡️ Cắt lỗ: {round(last['close']*0.93, 2)}")
-            bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
+            bot.send_message('1736294695', msg, parse_mode="Markdown")
 
     except Exception as e:
         print(f"Lỗi {symbol}: {e}")
