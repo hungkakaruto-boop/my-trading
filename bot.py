@@ -6,7 +6,7 @@ import telebot
 import pytz
 from datetime import datetime, timedelta
 # Import bản vnstock3 mới nhất
-from vnstock import Vnstock
+from vnstock3 import Vnstock
 
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
