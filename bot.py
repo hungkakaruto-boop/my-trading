@@ -75,20 +75,20 @@ def analyze_ultimate(symbol):
         high_10 = df['high'].shift(1).rolling(window=10).max().iloc[-1]
         vol_avg = df['volume'].rolling(window=20).mean().iloc[-1]
         
-        # Chỉ cần giá nằm trên đường trung bình ngắn hạn (EMA50) là được, bỏ qua EMA20
-is_uptrend = (last['close'] > last['ema50']) 
+        # ĐIỀU KIỆN NHẠY HƠN: Chỉ cần nằm trên EMA50 (Bỏ EMA200)
+        is_uptrend = last['close'] > last['ema50']
 
-        # Kịch bản 1: Pullback
+        # TH1: PULLBACK (Hỗ trợ HMA21)
         if is_uptrend and (last['low'] <= last['hma21']) and (last['close'] > last['hma21']) \
-           and (last['close'] > last['open']) and (last['banker'] > 35):
-            return {"type": "🔥 MUA PULLBACK (HỖ TRỢ)", "price": last['close'], "banker": round(last['banker'], 1)}
+           and (last['close'] > last['open']) and (last['banker'] > 30):
+            return {"type": "🔥 MUA PULLBACK", "price": last['close'], "banker": round(last['banker'], 1)}
 
-        # Kịch bản 2: Breakout
+        # TH2: BREAKOUT (Nới lỏng bb_width lên 0.25)
         if is_uptrend and (last['close'] > high_10) and (last['bb_width'] < 0.25) \
-           and (last['volume'] > vol_avg * 1.5) and (last['banker'] > 50):
-            return {"type": "🚀 MUA BÙNG NỔ (BREAKOUT)", "price": last['close'], "banker": round(last['banker'], 1)}
-
-        except Exception as e:
+           and (last['volume'] > vol_avg * 1.3) and (last['banker'] > 45):
+            return {"type": "🚀 MUA BÙNG NỔ", "price": last['close'], "banker": round(last['banker'], 1)}
+            
+    except Exception as e:
         print(f"Lỗi {symbol}: {e}")
     return None
 
