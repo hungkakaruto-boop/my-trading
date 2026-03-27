@@ -1,7 +1,7 @@
 import os
 import time
 import pandas as pd
-import pandas-ta as ta
+import pandas_ta as ta
 import telebot
 import pytz
 from datetime import datetime, timedelta
