@@ -40,13 +40,7 @@ try:
 except Exception as e:
     print(f"Lỗi gửi tin nhắn Telegram: {e}")
     print(f"Lỗi {symbol}: {e}")
-# 1. CẤU HÌNH HỆ THỐNG
-# ==========================================
-TOKEN = 'YOUR_TELEGRAM_BOT_TOKEN'
-CHAT_ID = 'YOUR_CHAT_ID'
-bot = telebot.TeleBot(TOKEN)
-stock = Vnstock()
-
+    
 # FULL DANH SÁCH 160 MÃ KHÔNG CẮT BỚT
 WATCHLIST = [
     'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', # Chứng khoán
