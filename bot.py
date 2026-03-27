@@ -40,99 +40,100 @@ try:
 except Exception as e:
     print(f"Lỗi gửi tin nhắn Telegram: {e}")
     print(f"Lỗi {symbol}: {e}")
-WATCHLIST = [
-    'VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB',
-    'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', 'PSI', 'IVS', 'TCI', 'WSS',
-    'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 
-    'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', 'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', 'VCG', 'HHV', 'LCG', 
-    'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', 'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', 'DGC', 
-    'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', 'GEG', 'NT2', 'HDG', 'TTA', 'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 
-    'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', 'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', 
-    'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', 'TNG', 'MSH', 'GIL', 'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI'
-]
+WATCHLIST = ['VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB', 'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', 'PSI', 'IVS', 'TCI', 'WSS', 'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', 'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', 'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', 'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', 'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', 'GEG', 'NT2', 'HDG', 'TTA', 'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', 'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', 'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', 'TNG', 'MSH', 'GIL', 'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI']
 
 # ==========================================
-# 2. LOGIC PHÂN TÍCH (ZERO-ERROR)
+# 2. BỘ LỌC TIN TỨC & SỰ KIỆN (CHỐNG "MÙ" TIN)
 # ==========================================
-def analyze_ultimate(symbol):
+def check_news_safety(symbol):
+    try:
+        # Lấy 3 tin mới nhất từ CafeF/Vietstock qua vnstock
+        news_df = stock_news(symbol)
+        if news_df.empty: return "💎 Tin tức: Ổn định"
+        
+        # Danh sách từ khóa nhạy cảm
+        blacklist = ['bị bắt', 'vi phạm', 'đình chỉ', 'thua lỗ', 'cắt margin', 'cảnh báo', 'hủy niêm yết', 'thanh tra']
+        
+        latest_titles = news_df['title'].head(3).tolist()
+        for title in latest_titles:
+            for word in blacklist:
+                if word in title.lower():
+                    return f"⚠️ CẢNH BÁO TIN XẤU: {title[:50]}..."
+        return "💎 Tin tức: Bình thường"
+    except:
+        return "🔍 Tin tức: Không có dữ liệu"
+
+# ==========================================
+# 3. LOGIC PHÂN TÍCH THÔNG MINH (SMART ANALYZER)
+# ==========================================
+def analyze_smart(symbol):
     try:
         df = stock_historical_data(symbol, "2024-01-01", datetime.now().strftime('%Y-%m-%d'), "1D")
-        if df.empty or len(df) < 100:
-            return None
+        if df.empty or len(df) < 50: return None
 
-        # Chỉ báo kỹ thuật
-        df['hma21'] = ta.hma(df['close'], length=21)
+        # Tính toán chỉ báo
         df['ema50'] = ta.ema(df['close'], length=50)
-        df['ema200'] = ta.ema(df['close'], length=200)
         df['rsi'] = ta.rsi(df['close'], length=13)
         df['banker'] = ((df['rsi'] - 30) * 2.5).clip(lower=0, upper=100)
+        df['vol_avg'] = df['volume'].rolling(window=20).mean()
         
-        bb = ta.bbands(df['close'], length=20, std=2)
-        df['bb_width'] = (bb['BBU_20_2.0'] - bb['BBL_20_2.0']) / bb['BBM_20_2.0']
-        
-        # Lấy dữ liệu phiên cuối
         last = df.iloc[-1]
-        high_10 = df['high'].shift(1).rolling(window=10).max().iloc[-1]
-        vol_avg = df['volume'].rolling(window=20).mean().iloc[-1]
+        prev = df.iloc[-2]
+        rel_vol = last['volume'] / last['vol_avg']
         
-        # ĐIỀU KIỆN NHẠY HƠN: Chỉ cần nằm trên EMA50 (Bỏ EMA200)
-        is_uptrend = last['close'] > last['ema50']
+        # Lọc thanh khoản thấp (Dưới 1 tỷ/phiên là bỏ)
+        if last['volume'] * last['close'] < 1000000: return None
 
-        # TH1: PULLBACK (Hỗ trợ HMA21)
-        if is_uptrend and (last['low'] <= last['hma21']) and (last['close'] > last['hma21']) \
-           and (last['close'] > last['open']) and (last['banker'] > 30):
-            return {"type": "🔥 MUA PULLBACK", "price": last['close'], "banker": round(last['banker'], 1)}
+        # TH1: BẮT SÓNG HỒI TỪ ĐÁY (REVERSAL)
+        is_reversal = (prev['rsi'] < 32) and (last['rsi'] > prev['rsi']) and (last['close'] > last['open'])
+        
+        # TH2: BREAKOUT NỀN NÉN CHẶT
+        bb = ta.bbands(df['close'], length=20, std=2)
+        bb_width = (bb['BBU_20_2.0'] - bb['BBL_20_2.0']) / bb['BBM_20_2.0']
+        high_10 = df['high'].shift(1).rolling(window=10).max().iloc[-1]
+        is_breakout = (last['close'] > high_10) and (bb_width.iloc[-1] < 0.28) and (last['close'] > last['ema50'])
 
-        # TH2: BREAKOUT (Nới lỏng bb_width lên 0.25)
-        if is_uptrend and (last['close'] > high_10) and (last['bb_width'] < 0.25) \
-           and (last['volume'] > vol_avg * 1.3) and (last['banker'] > 45):
-            return {"type": "🚀 MUA BÙNG NỔ", "price": last['close'], "banker": round(last['banker'], 1)}
-            
-    except Exception as e:
-        print(f"Lỗi {symbol}: {e}")
+        # XÁC NHẬN DÒNG TIỀN (Banker & Volume đột biến)
+        if rel_vol > 1.25 and last['banker'] > 25:
+            if is_reversal: return {"type": "🌀 HỒI PHỤC TỪ ĐÁY", "price": last['close'], "vol": round(rel_vol, 2)}
+            if is_breakout: return {"type": "🚀 BREAKOUT CHUẨN", "price": last['close'], "vol": round(rel_vol, 2)}
+    except: return None
     return None
 
 # ==========================================
-# ==========================================
-# 3. VẬN HÀNH & CẬP NHẬT TIẾN TRÌNH (BẢN CHỐNG LẶP)
+# 4. VẬN HÀNH (CHỐNG LẶP & CẬP NHẬT)
 # ==========================================
 def main_worker():
-    start_time = datetime.now()
-    # Gửi tin nhắn bắt đầu
-    bot.send_message(CHAT_ID, f"🔄 **BOT BẮT ĐẦU QUÉT 150 MÃ**\n🕒 Lúc: {start_time.strftime('%H:%M:%S')}")
-    
-    # Tạo một tin nhắn "Tiến trình" duy nhất để cập nhật
-    progress_msg = bot.send_message(CHAT_ID, "⏳ Đang khởi tạo bộ quét...")
+    start_time = datetime.now().strftime('%H:%M:%S')
+    # Gửi tin nhắn khởi tạo
+    status_msg = bot.send_message(CHAT_ID, f"🚀 **HỆ THỐNG QUÉT TOÀN DIỆN ĐÃ CHẠY**\n🕒 Lúc: {start_time}")
     
     found_count = 0
+    total = len(WATCHLIST)
+    
     for index, symbol in enumerate(WATCHLIST):
-        # Cập nhật tiến trình sau mỗi 10 mã (Sửa tin nhắn cũ, không gửi tin mới)
-        if (index + 1) % 10 == 0:
+        # Cập nhật tiến độ 20 mã một lần để tránh spam Telegram
+        if (index + 1) % 20 == 0 or (index + 1) == total:
             try:
-                bot.edit_message_text(
-                    chat_id=CHAT_ID,
-                    message_id=progress_msg.message_id,
-                    text=f"⏳ Tiến độ: {index + 1}/150 mã ({round((index+1)/150*100)}%)"
-                )
-            except:
-                pass # Tránh lỗi nếu Telegram không cho sửa nhanh quá
+                percent = round((index + 1) / total * 100)
+                bot.edit_message_text(f"📊 Đang quét: {index+1}/{total} mã ({percent}%)", CHAT_ID, status_msg.message_id)
+            except: pass
 
-        result = analyze_ultimate(symbol)
-        if result:
+        res = analyze_smart(symbol)
+        if res:
             found_count += 1
-            msg = f"💎 **TÍN HIỆU: {symbol}**\n"
-            msg += f"━━━━━━━━━━━━━━\n"
-            msg += f"🏅 Chiến thuật: `{result['type']}`\n"
-            msg += f"💵 Giá mua: **{result['price']}**\n"
-            msg += f"🐳 Cá mập: `{result['banker']}%` đỏ\n"
-            msg += f"━━━━━━━━━━━━━━"
-            bot.send_message(CHAT_ID, msg, parse_mode='Markdown')
-        
-        time.sleep(0.7) # Tăng nhẹ thời gian nghỉ để không bị spam API
+            news_txt = check_news_safety(symbol) # Check tin tức cho mã có tín hiệu
+            msg = (f"💎 **MÃ TIỀM NĂNG: {symbol}**\n"
+                   f"━━━━━━━━━━━━━━\n"
+                   f"🎯 Tín hiệu: `{res['type']}`\n"
+                   f"💵 Giá mua: **{res['price']}**\n"
+                   f"📊 Vol đột biến: x{res['vol']}\n"
+                   f"📰 {news_txt}\n"
+                   f"🛡️ Cắt lỗ: {round(res['price'] * 0.93, 2)}")
+            bot.send_message(CHAT_ID, msg)
+        time.sleep(0.6)
 
-    # Xóa tin nhắn tiến trình khi xong và báo kết thúc
-    bot.delete_message(CHAT_ID, progress_msg.message_id)
-    bot.send_message(CHAT_ID, f"🏁 **HOÀN THÀNH QUÉT**\n🔍 Tìm thấy: {found_count} cơ hội.")
+    bot.send_message(CHAT_ID, f"🏁 **HOÀN THÀNH!** Tìm thấy {found_count} mã.")
+
 if __name__ == "__main__":
     main_worker()
-        
