@@ -4,44 +4,50 @@ on:
   push:
     branches: [ "main" ]
   workflow_dispatch:
-schedule:
-    - cron: '15 2 * * 1-5'  # 9h15 sáng (Giờ VN) từ Thứ 2 đến Thứ 6
-    - cron: '15 7 * * 1-5'  # 14h15 chiều (Giờ VN) từ Thứ 2 đến Thứ 6
-  workflow_dispatch:        # Cho phép bạn nhấn nút "Run workflow" bằng tay
+name: run-bot
 
-# 2. QUAN TRỌNG NHẤT: Chế độ chống chạy đè (Concurrency)
-# Nếu bạn lỡ tay bấm Run 2 lần, nó sẽ tự hủy cái cũ để tránh lặp tin nhắn
+on:
+  schedule:
+    # Chạy lúc 9:15 sáng (Giờ VN là 2:15 UTC)
+    - cron: '15 2 * * 1-5'
+    # Chạy lúc 14:15 chiều (Giờ VN là 7:15 UTC)
+    - cron: '15 7 * * 1-5'
+  workflow_dispatch: # Nút bấm chạy tay trên GitHub
+
+# 🛡️ CHIẾN THUẬT CHỐNG LẶP (CONCURRENCY)
+# Nếu bạn bấm nút Run 2 lần, nó sẽ tự động HỦY (cancel) cái cũ để chạy cái mới.
+# Điều này giúp Telegram không bị bắn tin nhắn loạn xạ.
 concurrency:
-  group: stock-bot-group
+  group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  run-bot:
+  scan-market:
     runs-on: ubuntu-latest
     
     steps:
-      # Bước 1: Lấy code từ kho lưu trữ về máy ảo
-      - name: Checkout code
+      - name: 1. Lấy code từ Repository
         uses: actions/checkout@v4
 
-      # Bước 2: Cài đặt Python phiên bản ổn định
-      - name: Setup Python
+      - name: 2. Cài đặt Python 3.10
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip' # Tăng tốc độ cài đặt cho lần sau
+          cache: 'pip' # Lưu cache thư viện để lần sau chạy nhanh hơn
 
-      # Bước 3: Cài đặt các thư viện cần thiết
-      - name: Install dependencies
+      - name: 3. Cài đặt thư viện (Dependencies)
         run: |
           python -m pip install --upgrade pip
           pip install pandas pandas_ta vnstock pyTelegramBotAPI
 
-      # Bước 4: Chạy Bot
-      - name: Execute Scanner
+      - name: 4. Thực thi quét 150 mã
         env:
-          # Đảm bảo log xuất hiện ngay lập tức để theo dõi
+          # Đảm bảo Log hiện ra ngay lập tức trên màn hình GitHub
           PYTHONUNBUFFERED: 1
+          # Nếu bạn dùng Secret cho Token/ID thì khai báo ở đây, 
+          # còn nếu dán thẳng vào code bot.py thì không cần đoạn dưới.
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python bot.py
         env:
           TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
