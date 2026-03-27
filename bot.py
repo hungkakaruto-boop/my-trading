@@ -1,11 +1,11 @@
 import os
 import time
 import pandas as pd
-import pandas_ta as ta
+import pandas-ta as ta
 import telebot
 import pytz
 from datetime import datetime, timedelta
-# Sửa import sang bản vnstock3 mới nhất
+# Import bản vnstock3 mới nhất
 from vnstock import Vnstock
 
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
