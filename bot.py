@@ -88,7 +88,7 @@ is_uptrend = (last['close'] > last['ema50'])
            and (last['volume'] > vol_avg * 1.5) and (last['banker'] > 50):
             return {"type": "🚀 MUA BÙNG NỔ (BREAKOUT)", "price": last['close'], "banker": round(last['banker'], 1)}
 
-    except Exception as e:
+        except Exception as e:
         print(f"Lỗi {symbol}: {e}")
     return None
 
