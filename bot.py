@@ -6,7 +6,7 @@ import time
 import telebot
 import pytz
 from datetime import datetime, timedelta
-from vnstock3 import Vnstock
+from vnstock import Vnstock
 
 # 1. CẤU HÌNH HỆ THỐNG
 TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
