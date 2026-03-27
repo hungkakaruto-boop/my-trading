@@ -5,7 +5,7 @@ import numpy as np
 import time
 import telebot
 from datetime import datetime, timedelta
-from vnstock3 import Vnstock
+from vnstock2 import Vnstock
 
 # ĐỊNH NGHĨA BIẾN vn_tz TRƯỚC KHI SỬ DỤNG
 vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
