@@ -1,64 +1,40 @@
-name: Stock Scanner Bot Final
-
-on:
-  push:
-    branches: [ "main" ]
-  workflow_dispatch:
 name: run-bot
 
 on:
   schedule:
-    # Chạy lúc 9:15 sáng (Giờ VN là 2:15 UTC)
+    # 9:15 sáng VN (Thứ 2 - Thứ 6)
     - cron: '15 2 * * 1-5'
-    # Chạy lúc 14:15 chiều (Giờ VN là 7:15 UTC)
+    # 14:15 chiều VN (Thứ 2 - Thứ 6)
     - cron: '15 7 * * 1-5'
-  workflow_dispatch: # Nút bấm chạy tay trên GitHub
+  workflow_dispatch:
 
-# 🛡️ CHIẾN THUẬT CHỐNG LẶP (CONCURRENCY)
-# Nếu bạn bấm nút Run 2 lần, nó sẽ tự động HỦY (cancel) cái cũ để chạy cái mới.
-# Điều này giúp Telegram không bị bắn tin nhắn loạn xạ.
+# Chống chạy lặp tin nhắn: Nếu bấm Run 2 lần, cái cũ sẽ bị hủy để tránh nhiễu
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: stock-bot-group
   cancel-in-progress: true
 
 jobs:
-  scan-market:
+  run-bot:
     runs-on: ubuntu-latest
-    
     steps:
-      - name: 1. Lấy code từ Repository
+      - name: 1. Checkout code
         uses: actions/checkout@v4
 
-      - name: 2. Cài đặt Python 3.10
+      - name: 2. Setup Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip' # Lưu cache thư viện để lần sau chạy nhanh hơn
+          cache: 'pip'
 
-      - name: 3. Cài đặt thư viện (Dependencies)
+      - name: 3. Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install pandas pandas_ta vnstock pyTelegramBotAPI
 
-      - name: 4. Thực thi quét 150 mã
+      - name: 4. Execute Scanner
         env:
-          # Đảm bảo Log hiện ra ngay lập tức trên màn hình GitHub
           PYTHONUNBUFFERED: 1
-          # Nếu bạn dùng Secret cho Token/ID thì khai báo ở đây, 
-          # còn nếu dán thẳng vào code bot.py thì không cần đoạn dưới.
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          CHAT_ID: ${{ secrets.CHAT_ID }}
-        run: python bot.py
-        env:
           TELEGRAM_TOKEN: ${{'8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'}}
           TELEGRAM_CHAT_ID: ${{'1736294695'}}
-        run: |
-          # Kiểm tra vị trí file trước khi chạy để tránh lỗi No such file
-          echo "Checking files in directory:"
-          ls -la
-          if [ -f "bot.py" ]; then
-            python bot.py
-          else
-            echo "LOI: Khong tim thay file bot.py. Hay kiem tra lai ten file tren GitHub!"
-            exit 1
+        run: python bot.py
           fi
