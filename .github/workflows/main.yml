@@ -34,4 +34,4 @@ jobs:
           TELEGRAM_CHAT_ID: ${{'1736294695'}}
         run: python bot.py
           fi
-        run: python bot.py
+        
