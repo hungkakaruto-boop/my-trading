@@ -84,7 +84,7 @@ is_uptrend = (last['close'] > last['ema50'])
             return {"type": "🔥 MUA PULLBACK (HỖ TRỢ)", "price": last['close'], "banker": round(last['banker'], 1)}
 
         # Kịch bản 2: Breakout
-        if is_uptrend and (last['close'] > high_10) and (last['bb_width'] < 0.25)
+        if is_uptrend and (last['close'] > high_10) and (last['bb_width'] < 0.25) \
            and (last['volume'] > vol_avg * 1.5) and (last['banker'] > 50):
             return {"type": "🚀 MUA BÙNG NỔ (BREAKOUT)", "price": last['close'], "banker": round(last['banker'], 1)}
 
