@@ -1,20 +1,41 @@
 import os
+import time
+import pytz
 import pandas as pd
 import pandas_ta as ta
-import numpy as np
-import time
 import telebot
-import pytz
+from vnstock import *
+import datetime
 from datetime import datetime, timedelta
-from vnstock import Vnstock
+import concurrent.futures
 
-# 1. CẤU HÌNH HỆ THỐNG
-TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
-CHAT_ID = '1736294695'
-vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
+#  1. Lấy cấu hình từ GitHub Secrets
+TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
+CHAT_ID = os.getenv('1736294695')
+
+# 2. Ép kiểu CHAT_ID sang số nguyên để tránh lỗi "chat not found"
+try:
+    CHAT_ID = int('1736294695')
+except:
+    print("Loi: CHAT_ID khong hop le!")
 
 bot = telebot.TeleBot('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
-stock = Vnstock()
+
+# 3. Gửi tin nhắn kiểm tra đầu tiên
+try:
+    bot.send_message(CHAT_ID, "🚀 Bot Scan Cổ Phiếu đã bắt đầu chạy...")
+except Exception as e:
+    print(f"Loi gui tin nhan Telegram: {e}")
+# Headers giả lập trình duyệt để tránh FireAnt block
+FIREANT_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    "Referer": "https://fireant.vn/",
+    "Origin": "https://fireant.vn" }
+try:
+    bot.send_message(CHAT_ID, "🚀 Bot Scan Cổ Phiếu (FireAnt Data) đã bắt đầu chạy...")
+except Exception as e:
+    print(f"Lỗi gửi tin nhắn Telegram: {e}")
+    print(f"Lỗi {symbol}: {e}")
 
 # FULL DANH SÁCH 160 MÃ KHÔNG CẮT BỚT
 WATCHLIST = [
