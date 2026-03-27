@@ -183,9 +183,11 @@ def main_worker():
         try:
             df = stock.stock_historical_data(symbol=symbol, source='TCB', start_date=start_date, end_date=end_date)
             # Chuyển đổi tên cột cho đồng nhất (đề phòng API đổi format)
-            df.rename(columns=lambda x: x.lower(), inplace=True)
+            stock_obj = Vnstock().stock(symbol=symbol, source='VCI') 
+            df = stock_obj.quote.history(start=start_date, end=end_date, interval='1D')
         except Exception as e:
             print(f"Lỗi lấy dữ liệu {symbol}: {e}")
+            # Nếu lỗi, nghỉ 2 giây rồi mới sang mã tiếp theo để tránh bị khóa IP
             continue
 
         if df.empty or len(df) < 30:
@@ -209,7 +211,7 @@ def main_worker():
                        f"- Dấu hiệu: {res['logs']}")
                 send_telegram_msg(msg)
         
-        time.sleep(0.5) # Nghỉ nửa giây tránh Rate Limit
+        time.sleep(1.2) # Nghỉ nửa giây tránh Rate Limit
 
     # BÁO CÁO TỔNG KẾT
     if is_summary_time:
