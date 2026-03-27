@@ -13,7 +13,7 @@ TOKEN = os.getenv('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
 CHAT_ID = os.getenv('1736294695')
 vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
 
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
 stock = Vnstock()
 
 # FULL DANH SÁCH 160 MÃ KHÔNG CẮT BỚT
