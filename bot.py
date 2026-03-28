@@ -1,4 +1,4 @@
-Import os
+import os
 import time
 import pytz
 import pandas as pd
