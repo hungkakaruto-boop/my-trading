@@ -1,4 +1,4 @@
-vnstock3
+vnstock >= 0.2.9
 pandas
 requests
 pyTelegramBotAPI
