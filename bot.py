@@ -4,7 +4,7 @@ import pytz
 import pandas as pd
 import pandas_ta as ta
 import telebot
-from vnstock3 import *
+from vnstock import *
 import datetime
 from datetime import datetime, timedelta
 import concurrent.futures
@@ -22,15 +22,6 @@ today = datetime.now().strftime('%Y-%m-%d')
 
 # Khởi tạo với API Key (nên dùng Secret trên GitHub như mình nói ở trên)
 api_key = os.getenv('vnstock_ad0e8b158722ddb91c352af1bc45b91e') 
-stock = Vnstock(api_key=api_key)
-df = stock.stock_historical_data(
-    symbol='TCB', 
-    start_date='2026-01-01', 
-    end_date=today, 
-    resolution='1D', 
-    type='stock'
-)
-
 
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
 TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
