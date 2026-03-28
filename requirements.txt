@@ -1,0 +1,4 @@
+vnstock3
+pandas
+requests
+pyTelegramBotAPI
