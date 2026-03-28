@@ -20,7 +20,7 @@ jobs:
       - name: 2. Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: '3.12'
           # Đã xóa dòng cache ở đây để hết lỗi
 
       - name: 3. Install dependencies
