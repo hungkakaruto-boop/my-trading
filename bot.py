@@ -9,6 +9,29 @@ import datetime
 from datetime import datetime, timedelta
 import concurrent.futures
 
+
+# Thay 'your_api_key_here' bằng cái mã bạn vừa đăng ký được
+stock = Vnstock(api_key='vnstock_ad0e8b158722ddb91c352af1bc45b91e') 
+
+from datetime import datetime
+import os
+from vnstock3 import Vnstock
+
+# Lấy ngày hiện tại theo định dạng YYYY-MM-DD
+today = datetime.now().strftime('%Y-%m-%d')
+
+# Khởi tạo với API Key (nên dùng Secret trên GitHub như mình nói ở trên)
+api_key = os.getenv('vnstock_ad0e8b158722ddb91c352af1bc45b91e') 
+stock = Vnstock(api_key=api_key)
+df = stock.stock_historical_data(
+    symbol='TCB', 
+    start_date='2026-01-01', 
+    end_date=today, 
+    resolution='1D', 
+    type='stock'
+)
+
+
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
 TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
 CHAT_ID = '1736294695'
@@ -175,7 +198,7 @@ def main_worker():
     all_results = []
     total_symbols = len(WATCHLIST)
     
-    send_telegram_msg(f"🚀 BOSS V10.1 BẮT ĐẦU QUÉT {total_symbols} MÃ...")
+    send_telegram_msg(f"🚀 BOT BẮT ĐẦU QUÉT {total_symbols} MÃ...")
     
     start_date = (now - timedelta(days=90)).strftime('%Y-%m-%d')
     end_date = now.strftime('%Y-%m-%d')
