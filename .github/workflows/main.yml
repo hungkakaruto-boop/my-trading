@@ -1,35 +1,141 @@
-name: run-bot
+import os
+import time
+import pytz
+import pandas as pd
+import pandas_ta as ta
+import telebot
+from vnstock3 import Vnstock # Bắt buộc dùng vnstock3 để chạy được API Key
+import datetime
+from datetime import datetime, timedelta
 
-on:
-  schedule:
-    - cron: '15 2 * * 1-5'
-    - cron: '15 7 * * 1-5'
-  workflow_dispatch:
+# ==========================================
+# 1. CẤU HÌNH (THAY KEY CỦA BẠN VÀO ĐÂY)
+# ==========================================
+API_KEY = 'vnstock_ad0e8b158722ddb91c352af1bc45b91e'
+TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
+CHAT_ID = 1736294695
 
-concurrency:
-  group: stock-bot-group
-  cancel-in-progress: true
+stock = Vnstock(api_key=API_KEY)
+bot = telebot.TeleBot(TOKEN)
 
-jobs:
-  run-bot:
-    runs-on: ubuntu-latest
-    steps:
-      - name: 1. Checkout code
-        uses: actions/checkout@v4
+# Danh sách mã của bạn
+WATCHLIST = [
+    'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS',
+    'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH',
+    'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG',
+    'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC',
+    'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR',
+    'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV',
+    'VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB',
+    'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB',
+    'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS',
+    'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX',
+    'TNG', 'MSH', 'GIL',
+    'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI', 'GEG', 'NT2', 'TTA'
+]
 
-      - name: 2. Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          # Đã xóa dòng cache ở đây để hết lỗi
+# ==========================================
+# 2. BỘ NÃO (GIỮ NGUYÊN 100% THUẬT TOÁN CỦA BẠN)
+# ==========================================
+class UltimateBoss:
+    def __init__(self, df, symbol):
+        self.df = df
+        self.symbol = symbol
+        self.success = False
+        try:
+            self._add_indicators()
+            self.success = True
+        except Exception as e:
+            print(f"Lỗi tính toán chỉ báo mã {symbol}: {e}")
 
-       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install vnstock --upgrade
-          pip install pandas requests pyTelegramBotAPI
-      - name: 4. Execute Scanner
-        env:
-          TELEGRAM_TOKEN: '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
-          TELEGRAM_CHAT_ID: '1736294695'
-        run: python bot.py
+    def _add_indicators(self):
+        self.df['ma20'] = ta.sma(self.df['close'], length=20)
+        self.df['vma20'] = ta.sma(self.df['volume'], length=20)
+        bb = ta.bbands(self.df['close'], length=20, std=2)
+        self.df['bb_width'] = (bb['BBU_20_2.0'] - bb['BBL_20_2.0']) / bb['BBM_20_2.0']
+        macd = self.df.ta.macd()
+        self.df['hist'] = macd['MACDh_12_26_9']
+        self.df['hist_slope'] = self.df['hist'].diff()
+        mfi = ta.mfi(self.df['high'], self.df['low'], self.df['close'], self.df['volume'], length=14)
+        low_20 = self.df['low'].rolling(20).min()
+        high_20 = self.df['high'].rolling(20).max()
+        diff = high_20 - low_20
+        diff = diff.replace(0, 0.0001)
+        banker_raw = ((self.df['close'] - low_20) / diff * 100).rolling(3).mean()
+        self.df['banker'] = (banker_raw * 0.4) + (mfi.fillna(0) * 0.6)
+        self.df.dropna(subset=['ma20', 'vma20', 'bb_width', 'hist', 'banker'], inplace=True)
+
+    def analyze(self):
+        if not self.success or len(self.df) < 3: return None
+        last = self.df.iloc[-1]
+        prev = self.df.iloc[-2]
+        score = 0
+        logs = []
+        if last['banker'] > 15:
+            score += 2.0
+            logs.append(f"Tiền mồi ({round(last['banker'])}%)")
+            if last['banker'] > prev['banker']: 
+                score += 1.5
+                logs.append("Tiền nạp thêm")
+        if last['hist_slope'] > 0:
+            score += 1.5
+            logs.append("MACD hướng lên")
+            if last['hist'] > 0: 
+                score += 1.0
+                logs.append("Xung lực mạnh")
+        if last['bb_width'] < 0.12: 
+            score += 2.0
+            logs.append("Nén chặt")
+        elif last['close'] > last['ma20']: 
+            score += 1.0
+            logs.append("Trên MA20")
+        now = datetime.now()
+        vol_ratio = 0
+        if last['vma20'] > 0:
+            if 9 <= now.hour < 15:
+                if now.hour < 12: mins = (now.hour - 9) * 60 + now.minute - 15
+                else: mins = 135 + (now.hour - 13) * 60 + now.minute
+                mins = max(mins, 1)
+                projected_vol = (last['volume'] / mins) * 240
+                vol_ratio = projected_vol / last['vma20']
+            else: vol_ratio = last['volume'] / last['vma20']
+        if vol_ratio > 1.3: 
+            score += 2.0
+            logs.append(f"Nổ Vol (x{round(vol_ratio,1)})")
+        elif vol_ratio > 0.9: 
+            score += 1.0
+            logs.append("Vol ổn định")
+        upper_wick = last['high'] - max(last['close'], last['open'])
+        body = abs(last['close'] - last['open'])
+        is_trap = (upper_wick > (body * 0.6)) and (last['close'] < last['high'])
+        return {"symbol": self.symbol, "score": round(score, 1), "price": last['close'], "vol_ratio": round(vol_ratio, 1), "logs": " | ".join(logs), "is_trap": is_trap}
+
+# ==========================================
+# 3. VẬN HÀNH
+# ==========================================
+def main():
+    now = datetime.now()
+    bot.send_message(CHAT_ID, f"🚀 Bắt đầu quét {len(WATCHLIST)} mã...")
+    
+    start_date = (now - timedelta(days=90)).strftime('%Y-%m-%d')
+    end_date = now.strftime('%Y-%m-%d')
+    
+    results = []
+    for symbol in WATCHLIST:
+        try:
+            # DÙNG HÀM CHUẨN ĐỂ LẤY DATA VỚI API KEY
+            df = stock.stock_historical_data(symbol=symbol, start_date=start_date, end_date=end_date, resolution='1D', type='stock')
+            if df is None or df.empty: continue
+            
+            boss = UltimateBoss(df, symbol)
+            res = boss.analyze()
+            if res and res['score'] >= 7.5:
+                msg = f"🔥 TÍN HIỆU: {res['symbol']} | Điểm: {res['score']}\n- Giá: {res['price']}\n- Dấu hiệu: {res['logs']}"
+                bot.send_message(CHAT_ID, msg)
+            time.sleep(1.1) # Tránh bị khóa API
+        except: continue
+
+    bot.send_message(CHAT_ID, "✅ Đã quét xong!")
+
+if __name__ == "__main__":
+    main()
