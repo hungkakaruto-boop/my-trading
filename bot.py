@@ -13,10 +13,9 @@ import concurrent.futures
 # Thay 'your_api_key_here' bằng cái mã bạn vừa đăng ký được
 stock = Vnstock(api_key='vnstock_ad0e8b158722ddb91c352af1bc45b91e') 
 
-from datetime import datetime
-import os
-from vnstock3 import Vnstock
-
+# Sau đó dùng bình thường
+df = stock.trading.price_board(symbols=['TCB', 'SSI'])
+print(df)
 # Lấy ngày hiện tại theo định dạng YYYY-MM-DD
 today = datetime.now().strftime('%Y-%m-%d')
 
