@@ -12,7 +12,13 @@ import concurrent.futures
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
 TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
 CHAT_ID = '1736294695'
+# 2. Ép kiểu CHAT_ID sang số nguyên để tránh lỗi "chat not found"
+try:
+    CHAT_ID = int('1736294695')
+except:
+    print("Loi: CHAT_ID khong hop le!")
 
+bot = telebot.TeleBot('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
 bot = telebot.TeleBot(TOKEN)
 vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
 
