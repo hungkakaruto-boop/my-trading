@@ -27,3 +27,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install pandas pandas_ta vnstock pyTelegramBotAPI
+
+      - name: 4. Execute Scanner
+        env:
+          # DĂ¡n trá»±c tiáº¿p Token vĂ o Ä‘Ă¢y Ä‘á»ƒ trĂ¡nh lá»—i láº¥y biáº¿n mĂ´i trÆ°á»ng
+          BOT_TOKEN: "8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4"
+          BOT_CHAT_ID: "1736294695"
+        run: python bot.py
