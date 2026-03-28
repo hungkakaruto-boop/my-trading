@@ -1,18 +1,14 @@
-import os
+Import os
 import time
+import pytz
 import pandas as pd
 import pandas_ta as ta
 import telebot
-import pytz
+from vnstock import *
+import datetime
 from datetime import datetime, timedelta
-# Import bản vnstock3 mới nhất
-from vnstock import Vnstock
+import concurrent.futures
 
-# ... (bên trong vòng lặp)
-stock_obj = Vnstock().stock(symbol=symbol, source='KBS') 
-df = stock_obj.quote.history(start=start_date, end=end_date, interval='1D')
-
-# 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
 # 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
 TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
 CHAT_ID = '1736294695'
