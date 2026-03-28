@@ -4,7 +4,7 @@ import pytz
 import pandas as pd
 import pandas_ta as ta
 import telebot
-from vnstock import *
+from vnstock3 import *
 import datetime
 from datetime import datetime, timedelta
 import concurrent.futures
