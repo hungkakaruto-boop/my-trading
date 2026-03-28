@@ -4,6 +4,180 @@ import pandas as pd
 import pandas_ta as ta
 import numpy as np
 from datetime import datetime, timedelta
+from vnstock import *
+
+# --- CẤU HÌNH HỆ THỐNG ---
+TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+
+def send_telegram(message):
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+    requests.post(url, json=payload)
+
+# =========================================================
+# PHẦN MỞ RỘNG: DANH SÁCH 150 MÃ (VN100 + 50 MÃ MẠNH)
+# =========================================================
+def get_comprehensive_watch_list():
+    try:
+        # 1. Lấy danh sách VN100 chính thức
+        vn100 = index_components("VN100")
+        
+        # 2. Danh sách 50 mã mạnh/thanh khoản cao ngoài VN100 (Sàn HNX, UPCoM & Midcap khác)
+        # Đây là các mã thường có sóng T+ cực gắt
+        high_liquidity_others = [
+            'ACV', 'VGI', 'MCH', 'FOX', 'VTP', 'BGI', 'VGS', 'IDC', 'TNG', 'PVS', 
+            'PVS', 'PVC', 'PVB', 'IDP', 'MML', 'DDV', 'BSR', 'OIL', 'C4G', 'HHV',
+            'LDB', 'VNB', 'MFS', 'VEA', 'MHT', 'ABB', 'NAB', 'KLB', 'BVB', 'SGB',
+            'TCI', 'AAS', 'VFS', 'DSC', 'TVS', 'VUA', 'TIP', 'D2D', 'SZC', 'NTC',
+            'SIP', 'GVR', 'PHR', 'DPR', 'TRC', 'DRI', 'VOC', 'SEA', 'VGT', 'TDT'
+        ]
+        
+        full_list = list(set(vn100 + high_liquidity_others))
+        return full_list[:150] # Đảm bảo tối đa 150 mã để tối ưu tốc độ quét
+    except:
+        # Backup list nếu API vnstock gặp sự cố
+        return ['SSI', 'VND', 'VCI', 'HCM', 'HPG', 'HSG', 'NKG', 'GEX', 'PC1', 'DIG', 'DXG', 'PVD', 'PVC', 'MSN', 'VHM', 'ACV']
+
+# ---------------------------------------------------------
+# THUẬT TOÁN 1: MCDX PRO (BANKER CASHFLOW)
+# ---------------------------------------------------------
+def calculate_mcdx_ultimate(df):
+    # RSI chu kỳ ngắn để nhạy với T+
+    rsi = ta.rsi(df['close'], length=10)
+    # Banker (Đỏ): Dòng tiền lớn
+    df['mcdx_red'] = (rsi - 35).clip(lower=0) * 2.8
+    # Retail (Xanh): Dòng tiền nhỏ lẻ
+    df['mcdx_green'] = (75 - rsi).clip(lower=0) * 1.6
+    # Speculator (Vàng): Đầu cơ
+    df['mcdx_yellow'] = 100 - df['mcdx_red'] - df['mcdx_green']
+    df['mcdx_yellow'] = df['mcdx_yellow'].clip(lower=0)
+    return df
+
+# ---------------------------------------------------------
+# THUẬT TOÁN 2: VSA NÂNG CAO & VOL SPREAD
+# ---------------------------------------------------------
+def detect_vsa_signals(df):
+    curr = df.iloc[-1]
+    prev = df.iloc[-2]
+    vol_avg = df['volume'].rolling(window=20).mean().iloc[-1]
+    
+    vsa_msg = []
+    # SOS: Giá tăng + Vol nổ (Big Boy đẩy)
+    if curr['close'] > prev['close'] and curr['volume'] > 1.6 * vol_avg:
+        vsa_msg.append("🚀 SOS: Dòng tiền bùng nổ")
+    # No Supply Test: Giá xanh + Vol thấp (Cạn cung)
+    if curr['close'] > prev['close'] and curr['volume'] < vol_avg * 0.7:
+        vsa_msg.append("🛡️ No Supply: Cạn cung, sẵn sàng bay")
+    # Spring/Shakeout: Quét chân nến
+    if curr['low'] < prev['low'] and curr['close'] > prev['close'] and curr['volume'] > vol_avg:
+        vsa_msg.append("🌪️ Shakeout: Rũ bỏ thành công")
+        
+    return vsa_msg
+
+# ---------------------------------------------------------
+# THUẬT TOÁN 3: PHÂN TÍCH CHUYÊN SÂU 150 MÃ
+# ---------------------------------------------------------
+def analyze_ultimate_stock(ticker):
+    try:
+        # 1. Lấy dữ liệu cơ bản
+        ls_df = listing_companies()
+        company_info = ls_df[ls_df['ticker'] == ticker].iloc[0]
+        
+        # 2. Dữ liệu kỹ thuật (EMA 8/21 cho T+)
+        df = stock_historical_data(symbol=ticker, start_date="2025-08-01", end_date="2026-03-29", resolution="1D", type="stock")
+        df.ta.ema(length=8, append=True)
+        df.ta.ema(length=21, append=True)
+        df.ta.atr(length=10, append=True)
+        df = calculate_mcdx_ultimate(df)
+        
+        curr = df.iloc[-1]
+        prev = df.iloc[-2]
+        
+        # 3. Hệ thống chấm điểm T+ (Max 10)
+        score = 0
+        if curr['EMA_8'] > curr['EMA_21']: score += 2 # Xu hướng ngắn hạn
+        if curr['mcdx_red'] > 25: score += 3          # Cá mập vào tiền
+        if curr['mcdx_red'] > 50: score += 2          # Cá mập áp đảo
+        if curr['volume'] > df['volume'].rolling(15).mean().iloc[-1]: score += 2 # Đột biến Vol
+        if curr['close'] > prev['close'] * 1.02: score += 1 # Biên độ giá tốt
+
+        # 4. Target & Stoploss (Theo biên độ ATR)
+        atr = curr['ATRr_10']
+        t1 = round(curr['close'] + atr * 1.5, 1)
+        sl = round(curr['close'] - atr * 1.2, 1)
+        rr = round((t1 - curr['close']) / (curr['close'] - sl), 2)
+
+        return {
+            "ticker": ticker,
+            "name": company_info['organ_name'],
+            "price": curr['close'],
+            "change": round(((curr['close']-prev['close'])/prev['close'])*100, 2),
+            "mcdx_r": round(curr['mcdx_red'], 1),
+            "mcdx_y": round(curr['mcdx_yellow'], 1),
+            "vsa": detect_vsa_signals(df),
+            "score": score,
+            "target": t1,
+            "stoploss": sl,
+            "rr": rr,
+            "vol": curr['volume']
+        }
+    except: return None
+
+# ---------------------------------------------------------
+# THUẬT TOÁN 4: QUẢN TRỊ & BÁO CÁO (XỬ LÝ 150 MÃ)
+# ---------------------------------------------------------
+def main():
+    watch_list = get_comprehensive_watch_list()
+    final_list = []
+
+    print(f"[{datetime.now().strftime('%H:%M')}] Bắt đầu quét 150 mã...")
+    
+    for ticker in watch_list:
+        data = analyze_ultimate_stock(ticker)
+        if data: final_list.append(data)
+
+    # 1. BÁO CÁO TOP 5 MÃ "NÓNG" NHẤT PHIÊN
+    top_5 = sorted(final_list, key=lambda x: x['score'], reverse=True)[:5]
+    
+    header = "🚨 **T+ ULTIMATE SCANNER (150 TICKERS)** 🚨\n"
+    header += f"📅 Phiên: {datetime.now().strftime('%d/%m/%Y %H:%M')}\n\n"
+    header += "🏆 **BẢNG XẾP HẠNG SIÊU CỔ PHIẾU:**\n"
+    for i, item in enumerate(top_5, 1):
+        header += f"{i}. **{item['ticker']}** | Điểm: `{item['score']}/10` | R/R: `{item['rr']}`\n"
+    send_telegram(header)
+
+    # 2. CHI TIẾT KÈO (Chỉ gửi các mã có điểm cực cao > 6)
+    for f in final_list:
+        if f['score'] >= 7: # Chỉ lọc những mã thực sự bùng nổ
+            msg = f"🔥 **KÈO LƯỚT SIÊU CẤP: {f['ticker']}** 🔥\n"
+            msg += f"🏢 {f['name']}\n"
+            msg += f"∟ Giá: **{f['price']}** ({f['change']}%)\n"
+            msg += f"∟ Vol: {f['vol']:,}\n\n"
+            
+            msg += f"🔴 **DÒNG TIỀN CÁ MẬP (MCDX):** `{f['mcdx_r']}%`\n"
+            msg += f"🟡 **DÒNG TIỀN ĐẦU CƠ:** `{f['mcdx_y']}%`\n\n"
+            
+            msg += f"📈 **TÍN HIỆU CHIẾN THUẬT:**\n"
+            for v in f['vsa']: msg += f"∟ {v}\n"
+            if not f['vsa']: msg += "∟ Nền giá chặt chẽ, đang tích lũy\n"
+            
+            msg += f"\n🎯 **CHIẾN LƯỢC T+3:**\n"
+            msg += f"∟ Mục tiêu chốt lời: **{f['target']}**\n"
+            msg += f"∟ Cắt lỗ tuyệt đối: **{f['stoploss']}**\n"
+            msg += f"∟ Tỷ lệ R/R: **{f['rr']}**\n"
+            msg += f"—————————————\n"
+            msg += "⚡️ *Phát hiện sớm - Vào nhanh - Ra gọn!*"
+            send_telegram(msg)
+
+if __name__ == "__main__":
+    main()
+ os
+import requests
+import pandas as pd
+import pandas_ta as ta
+import numpy as np
+from datetime import datetime, timedelta
 from vnstock import stock_historical_data, financial_flow, listing_companies
 
 # ==========================================
