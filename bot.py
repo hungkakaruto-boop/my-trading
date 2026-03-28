@@ -4,38 +4,25 @@ import pytz
 import pandas as pd
 import pandas_ta as ta
 import telebot
-from vnstock import *
+from vnstock3 import Vnstock  # Sửa lại khai báo cho đúng bản vnstock3
 import datetime
 from datetime import datetime, timedelta
 import concurrent.futures
 
+# ==========================================
+# 1. CẤU HÌNH API & TELEGRAM
+# ==========================================
+# Khai báo trực tiếp Key để chạy luôn (Chú ý bảo mật repo nhé)
+VNSTOCK_API_KEY = 'vnstock_ad0e8b158722ddb91c352af1bc45b91e'
+stock = Vnstock(api_key=VNSTOCK_API_KEY) 
 
-# Thay 'your_api_key_here' bằng cái mã bạn vừa đăng ký được
-stock = Vnstock(api_key='vnstock_ad0e8b158722ddb91c352af1bc45b91e') 
-
-# Sau đó dùng bình thường
-df = stock.trading.price_board(symbols=['TCB', 'SSI'])
-print(df)
-# Lấy ngày hiện tại theo định dạng YYYY-MM-DD
-today = datetime.now().strftime('%Y-%m-%d')
-
-# Khởi tạo với API Key (nên dùng Secret trên GitHub như mình nói ở trên)
-api_key = os.getenv('vnstock_ad0e8b158722ddb91c352af1bc45b91e') 
-
-# 1. Cấu hình cứng để chống lỗi Token (Dán thẳng, không dùng os.getenv)
 TOKEN = '8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4'
-CHAT_ID = '1736294695'
-# 2. Ép kiểu CHAT_ID sang số nguyên để tránh lỗi "chat not found"
-try:
-    CHAT_ID = int('1736294695')
-except:
-    print("Loi: CHAT_ID khong hop le!")
+CHAT_ID = 1736294695  # Ép cứng số nguyên luôn cho chắc cú
 
-bot = telebot.TeleBot('8625301702:AAHLOJgz_fIkfA6WpU7Sr60KjRIzc7nmHR4')
 bot = telebot.TeleBot(TOKEN)
 vn_tz = pytz.timezone('Asia/Ho_Chi_Minh')
 
-# 3. Gửi tin nhắn kiểm tra đầu tiên
+# Gửi tin nhắn kiểm tra đầu tiên
 try:
     bot.send_message(CHAT_ID, "🚀 Bot Scan Cổ Phiếu V10.1 (vnstock3 Data) đã bắt đầu chạy...")
 except Exception as e:
@@ -43,22 +30,22 @@ except Exception as e:
     
 # FULL DANH SÁCH 160 MÃ KHÔNG CẮT BỚT
 WATCHLIST = [
-    'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS', # Chứng khoán
-    'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH', # Thép
-    'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG', # BĐS & KCN
-    'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC', # Đầu tư công & Xây dựng
-    'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR', # Năng lượng & Dầu khí
-    'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV', # Hóa chất & Phân bón
-    'VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB', # Ngân hàng
-    'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB', # Trụ & Bán lẻ & Công nghệ
-    'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS', # Hàng không & Cảng biển
-    'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX', # Thủy sản
-    'TNG', 'MSH', 'GIL', # Dệt may
-    'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI', 'GEG', 'NT2', 'TTA' # Nông nghiệp & Cao su & Điện
+    'SSI', 'VND', 'VCI', 'HCM', 'FTS', 'MBS', 'BSI', 'CTS', 'VIX', 'SHS', 'ORS', 'AGR', 'TVS', 'BVS', 'VDS', 'SBS',
+    'HPG', 'HSG', 'NKG', 'VGS', 'TVN', 'SMC', 'TLH',
+    'VHM', 'VIC', 'VRE', 'PDR', 'DIG', 'DXG', 'NLG', 'KDH', 'CEO', 'TCH', 'NVL', 'HDG', 'KBC', 'GVR', 'BCM', 'IDC', 'SZC', 'VGC', 'PHR', 'ITA', 'SJS', 'SZL', 'TIP', 'LHG', 'D2D', 'NTC', 'NTL', 'QCG', 'AGG', 'KHG',
+    'VCG', 'HHV', 'LCG', 'C4G', 'FCN', 'HT1', 'BCC', 'BMP', 'CTD', 'HBC',
+    'PC1', 'TV2', 'REE', 'GAS', 'POW', 'PVS', 'PVD', 'PVB', 'PVC', 'PLX', 'OIL', 'BSR',
+    'DGC', 'DCM', 'DPM', 'CSV', 'LAS', 'BFC', 'DDV',
+    'VCB', 'BID', 'CTG', 'TCB', 'MBB', 'ACB', 'HDB', 'VPB', 'STB', 'LPB', 'TPB', 'VIB', 'MSB', 'OCB', 'SHB', 'SSB', 'NAB', 'BAB', 'BVB', 'SGB',
+    'FPT', 'MWG', 'MSN', 'PNJ', 'FRT', 'DGW', 'PET', 'CTR', 'VNM', 'SAB', 'VGI', 'FOX', 'CMG', 'ELC', 'VEA', 'MCH', 'MML', 'MSR', 'BHN', 'HAB',
+    'VJC', 'HVN', 'ACV', 'GMD', 'HAH', 'VOS', 'VSC', 'MVN', 'SCS', 'TMS',
+    'VHC', 'ANV', 'IDI', 'FMC', 'ACL', 'MPC', 'CMX',
+    'TNG', 'MSH', 'GIL',
+    'DBC', 'HAG', 'HNG', 'BAF', 'PAN', 'LTG', 'VIF', 'DPR', 'TRC', 'DRI', 'GEG', 'NT2', 'TTA'
 ]
 
 # ==========================================
-# 2. BỘ NÃO PHÂN TÍCH (BOSS ENGINE CORE)
+# 2. BỘ NÃO PHÂN TÍCH (BOSS ENGINE CORE) - GIỮ NGUYÊN 100%
 # ==========================================
 class UltimateBoss:
     def __init__(self, df, symbol):
@@ -85,7 +72,7 @@ class UltimateBoss:
         self.df['hist'] = macd['MACDh_12_26_9']
         self.df['hist_slope'] = self.df['hist'].diff()
         
-        # MCDX Hybrid (Dòng tiền Cá mập) - Thêm fillna để tránh lỗi NaN
+        # MCDX Hybrid (Dòng tiền Cá mập)
         mfi = ta.mfi(self.df['high'], self.df['low'], self.df['close'], self.df['volume'], length=14)
         low_20 = self.df['low'].rolling(20).min()
         high_20 = self.df['high'].rolling(20).max()
@@ -174,16 +161,14 @@ class UltimateBoss:
 # 3. QUY TRÌNH VẬN HÀNH CHÍNH
 # ==========================================
 def send_telegram_msg(msg):
-    """Hàm gửi tin nhắn an toàn, chống lỗi parse Markdown"""
     try:
-        # Không dùng parse_mode="Markdown" để tránh bị lỗi vỡ font làm sập Bot
         bot.send_message(CHAT_ID, msg)
     except Exception as e:
         print(f"Lỗi gửi Telegram: {e}")
 
 def main_worker():
     now = datetime.now()
-    is_summary_time = (now.hour == 14 and now.minute >= 45) or (now.hour >= 15) or (now.hour < 8) # Bao gồm cả buổi tối
+    is_summary_time = (now.hour == 14 and now.minute >= 45) or (now.hour >= 15) or (now.hour < 8)
     
     all_results = []
     total_symbols = len(WATCHLIST)
@@ -194,28 +179,29 @@ def main_worker():
     end_date = now.strftime('%Y-%m-%d')
 
     for i, symbol in enumerate(WATCHLIST):
-        # In tiến độ ra console (nếu chạy trên GitHub Actions sẽ dễ debug)
         print(f"Đang quét {i+1}/{total_symbols}: {symbol}...")
         
-        df = pd.DataFrame()
-        # Tách riêng block try-except cho Data Fetching
         df = None
         try:
-            # DÙNG NGUỒN KBS ĐỂ LÁCH TƯỜNG LỬA TRÊN GITHUB ACTIONS
-            stock_obj = Vnstock().stock(symbol=symbol, source='KBS') 
-            df = stock_obj.quote.history(start=start_date, end=end_date, interval='1D')
+            # SỬ DỤNG CÚ PHÁP CHUẨN CỦA VNSTOCK3 VỚI API KEY
+            df = stock.stock_historical_data(
+                symbol=symbol, 
+                start_date=start_date, 
+                end_date=end_date, 
+                resolution='1D', 
+                type='stock'
+            )
             
-            # Bắt lỗi thêm trường hợp API sống nhưng trả về data rỗng
             if df is None or df.empty:
-                print(f"⚠️ {symbol}: API KBS trả về dữ liệu trống.")
+                print(f"⚠️ {symbol}: Không lấy được dữ liệu.")
                 continue
                 
         except Exception as e:
-            print(f"❌ Lỗi API tại mã {symbol} (Có thể do mạng): {e}")
+            print(f"❌ Lỗi API tại mã {symbol}: {e}")
             continue
 
-        if df.empty or len(df) < 30:
-            print(f"Dữ liệu {symbol} quá ngắn hoặc trống.")
+        if len(df) < 30:
+            print(f"Dữ liệu {symbol} quá ngắn.")
             continue
             
         # Tính toán và phân tích
@@ -225,7 +211,7 @@ def main_worker():
         if res is not None:
             all_results.append(res)
             
-            # BÁO TRONG PHIÊN (Chỉ báo nếu điểm >= 7.5 và đang trong giờ giao dịch)
+            # BÁO TRONG PHIÊN
             if not is_summary_time and res['score'] >= 7.5:
                 trap = "CẨN THẬN RÂU NẾN!" if res['is_trap'] else "Lực cầu Tốt"
                 msg = (f"🔥 TÍN HIỆU NGON: {symbol}\n"
@@ -235,12 +221,13 @@ def main_worker():
                        f"- Dấu hiệu: {res['logs']}")
                 send_telegram_msg(msg)
         
-        time.sleep(1.2) # Nghỉ nửa giây tránh Rate Limit
+        # Nghỉ 1.2s để an toàn dưới mức 60 request/phút của gói Community
+        time.sleep(1.2) 
 
     # BÁO CÁO TỔNG KẾT
     if is_summary_time:
         if len(all_results) == 0:
-            send_telegram_msg("⚠️ Lỗi: Không quét được dữ liệu của bất kỳ mã nào! Hãy kiểm tra lại API vnstock.")
+            send_telegram_msg("⚠️ Lỗi: Không quét được dữ liệu. Kiểm tra lại API Key.")
             return
 
         all_results.sort(key=lambda x: x['score'], reverse=True)
@@ -259,4 +246,4 @@ def main_worker():
 
 if __name__ == "__main__":
     main_worker()
-        
+
