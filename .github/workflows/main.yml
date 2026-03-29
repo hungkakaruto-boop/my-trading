@@ -20,10 +20,11 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
+          
       - name: Install dependencies
-        run: pip install -r requirements.txt
-
+        run: |
+          pip install pandas pandas_ta requests numpy vnstock
+  
       - name: Run Bot
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
