@@ -23,8 +23,8 @@ jobs:
           
       - name: Install dependencies
         run: |
-          pip install pandas pandas_ta requests numpy vnstock
-  
+          pip install --upgrade pip
+          pip install pandas pandas_ta requests vnstock
       - name: Run Bot
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
