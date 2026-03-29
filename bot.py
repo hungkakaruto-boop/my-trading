@@ -3,8 +3,8 @@ import requests
 import pandas as pd
 import pandas_ta as ta
 from datetime import datetime, timedelta
-# Sửa cách import để tránh lỗi NameError
-from vnstock import Stock
+# Import đích danh hàm chuẩn của vnstock để không bao giờ bị lỗi NameError hay ImportError
+from vnstock import stock_historical_data
 
 def send_telegram(message):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
@@ -15,19 +15,19 @@ def send_telegram(message):
         requests.post(url, json=payload, timeout=10)
     except: pass
 
-def get_data(symbol, is_index=False):
+def get_data(symbol):
     end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=300)).strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=200)).strftime('%Y-%m-%d')
     try:
-        stock = Stock(symbol=symbol, source='VCI') # Dùng nguồn VCI cho ổn định
-        df = stock.trading.history(start_date=start_date, end_date=end_date)
+        # Gọi thẳng hàm stock_historical_data
+        df = stock_historical_data(symbol, start_date, end_date, "1D", "stock")
         return df
-    except: return None
+    except: 
+        return None
 
 def analyze(ticker):
     df = get_data(ticker)
     if df is None or len(df) < 50: return None
-    
 # 2. WATCHLIST 150 MÃ & DỮ LIỆU THỊ TRƯỜNG
 # ==========================================
 def get_comprehensive_watch_list():
