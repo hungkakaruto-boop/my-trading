@@ -5,7 +5,6 @@ import pandas_ta as ta
 import numpy as np
 from datetime import datetime, timedelta
 from vnstock import *
-
 # ==========================================
 # 1. CẤU HÌNH HỆ THỐNG
 # ==========================================
