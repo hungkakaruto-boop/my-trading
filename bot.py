@@ -1,30 +1,32 @@
 import os
+import time
 import requests
 import pandas as pd
 import pandas_ta as ta
 from datetime import datetime, timedelta
-# Import theo chuẩn mới nhất của vnstock
 from vnstock import Vnstock
+
 def send_telegram(message):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    if not token or not chat_id: return
     url = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     try:
         requests.post(url, json=payload, timeout=10)
     except: pass
 
-def get_data(symbol):
-    end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=200)).strftime('%Y-%m-%d')
+def analyze_stock(ticker):
     try:
-        # Gọi thẳng hàm stock_historical_data
-        quote.history và tham số start, end
+        end_date = datetime.now().strftime('%Y-%m-%d')
+        start_date = (datetime.now() - timedelta(days=200)).strftime('%Y-%m-%d')
+        
+        # Cấu trúc chuẩn cho vnstock v5
         stock = Vnstock().stock(symbol=ticker, source='VCI')
         df = stock.quote.history(start=start_date, end=end_date, interval='1D')
         
-        if df is None or df.empty or len(df) < 50:
-            return None
+        if df is None or df.empty or len(df) < 50: return None
+        df.columns = [c.lower() for c in df.columns]
 # 2. WATCHLIST 150 MÃ & DỮ LIỆU THỊ TRƯỜNG
 # ==========================================
 def get_comprehensive_watch_list():
