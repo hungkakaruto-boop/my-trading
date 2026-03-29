@@ -3,9 +3,8 @@ import requests
 import pandas as pd
 import pandas_ta as ta
 from datetime import datetime, timedelta
-# Import đích danh hàm chuẩn của vnstock để không bao giờ bị lỗi NameError hay ImportError
-from vnstock import stock_historical_data
-
+# Cách import này sẽ giúp bot tự thích nghi với mọi phiên bản vnstock
+import vnstock
 def send_telegram(message):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
