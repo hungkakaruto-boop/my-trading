@@ -2,32 +2,32 @@ import os
 import requests
 import pandas as pd
 import pandas_ta as ta
-import numpy as np
 from datetime import datetime, timedelta
-# Sửa lỗi Import ở đây
-from vnstock import * # --- CẤU HÌNH ---
-TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
-TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
+# Sửa cách import để tránh lỗi NameError
+from vnstock import Stock
 
 def send_telegram(message):
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
+    token = os.environ.get("TELEGRAM_BOT_TOKEN")
+    chat_id = os.environ.get("TELEGRAM_CHAT_ID")
+    url = f"https://api.telegram.org/bot{token}/sendMessage"
+    payload = {"chat_id": chat_id, "text": message, "parse_mode": "Markdown"}
     try:
         requests.post(url, json=payload, timeout=10)
-    except:
-        pass
+    except: pass
 
-def get_dates():
-    # Tự động lấy ngày hiện tại để quét dữ liệu mới nhất
+def get_data(symbol, is_index=False):
     end_date = datetime.now().strftime('%Y-%m-%d')
-    start_date = (datetime.now() - timedelta(days=200)).strftime('%Y-%m-%d')
-    return start_date, end_date
+    start_date = (datetime.now() - timedelta(days=300)).strftime('%Y-%m-%d')
+    try:
+        stock = Stock(symbol=symbol, source='VCI') # Dùng nguồn VCI cho ổn định
+        df = stock.trading.history(start_date=start_date, end_date=end_date)
+        return df
+    except: return None
 
-def get_market_index():
-    start, end = get_dates()
-    # Sử dụng đúng hàm của vnstock
-    return stock_historical_data("VNINDEX", start, end, "1D", "index")
-# ==========================================
+def analyze(ticker):
+    df = get_data(ticker)
+    if df is None or len(df) < 50: return None
+    
 # 2. WATCHLIST 150 MÃ & DỮ LIỆU THỊ TRƯỜNG
 # ==========================================
 def get_comprehensive_watch_list():
