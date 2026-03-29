@@ -3,8 +3,8 @@ import requests
 import pandas as pd
 import pandas_ta as ta
 from datetime import datetime, timedelta
-# Import nguyên thư viện để tránh lỗi NameError
-import vnstock
+# Import theo chuẩn mới nhất của vnstock
+from vnstock import Vnstock
 def send_telegram(message):
     token = os.environ.get("TELEGRAM_BOT_TOKEN")
     chat_id = os.environ.get("TELEGRAM_CHAT_ID")
