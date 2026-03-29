@@ -19,14 +19,12 @@ def get_data(symbol):
     start_date = (datetime.now() - timedelta(days=200)).strftime('%Y-%m-%d')
     try:
         # Gọi thẳng hàm stock_historical_data
-        df = stock_historical_data(symbol, start_date, end_date, "1D", "stock")
-        return df
-    except: 
-        return None
-
-def analyze(ticker):
-    df = get_data(ticker)
-    if df is None or len(df) < 50: return None
+        quote.history và tham số start, end
+        stock = Vnstock().stock(symbol=ticker, source='VCI')
+        df = stock.quote.history(start=start_date, end=end_date, interval='1D')
+        
+        if df is None or df.empty or len(df) < 50:
+            return None
 # 2. WATCHLIST 150 MÃ & DỮ LIỆU THỊ TRƯỜNG
 # ==========================================
 def get_comprehensive_watch_list():
