@@ -4,10 +4,8 @@ import pandas as pd
 import pandas_ta as ta
 import numpy as np
 from datetime import datetime, timedelta
-from vnstock import *
-# ==========================================
-# 1. CẤU HÌNH HỆ THỐNG
-# ==========================================
+# Sửa lỗi Import ở đây
+from vnstock import * # --- CẤU HÌNH ---
 TELEGRAM_BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID")
 
@@ -16,8 +14,19 @@ def send_telegram(message):
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "Markdown"}
     try:
         requests.post(url, json=payload, timeout=10)
-    except: pass
+    except:
+        pass
 
+def get_dates():
+    # Tự động lấy ngày hiện tại để quét dữ liệu mới nhất
+    end_date = datetime.now().strftime('%Y-%m-%d')
+    start_date = (datetime.now() - timedelta(days=200)).strftime('%Y-%m-%d')
+    return start_date, end_date
+
+def get_market_index():
+    start, end = get_dates()
+    # Sử dụng đúng hàm của vnstock
+    return stock_historical_data("VNINDEX", start, end, "1D", "index")
 # ==========================================
 # 2. WATCHLIST 150 MÃ & DỮ LIỆU THỊ TRƯỜNG
 # ==========================================
