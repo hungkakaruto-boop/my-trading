@@ -18,15 +18,12 @@ def send_telegram(message):
 
 def analyze_stock(ticker):
     try:
-        end_date = datetime.now().strftime('%Y-%m-%d')
-        start_date = (datetime.now() - timedelta(days=200)).strftime('%Y-%m-%d')
-        
-        # Cấu trúc chuẩn cho vnstock v5
         stock = Vnstock().stock(symbol=ticker, source='VCI')
-        df = stock.quote.history(start=start_date, end=end_date, interval='1D')
+        end_d = datetime.now().strftime('%Y-%m-%d')
+        start_d = (datetime.now() - timedelta(days=200)).strftime('%Y-%m-%d')
         
-        if df is None or df.empty or len(df) < 50: return None
-        df.columns = [c.lower() for c in df.columns]
+        df = stock.quote.history(start=start_d, end=end_d, interval='1D')
+        if df is None or df.empty: return None
 # 2. WATCHLIST 150 MÃ & DỮ LIỆU THỊ TRƯỜNG
 # ==========================================
 def get_comprehensive_watch_list():
