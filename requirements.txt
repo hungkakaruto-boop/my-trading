@@ -1,2 +1,2 @@
-pandas-ta
+pandas_ta
 requests==2.31.0
