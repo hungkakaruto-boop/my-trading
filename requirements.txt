@@ -3,6 +3,6 @@ requests
 pandas
 pandas-ta
 vnstock
-Vnstock3
+vnstock3
 datetime
 ipython
