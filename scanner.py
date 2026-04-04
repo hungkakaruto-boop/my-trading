@@ -19,7 +19,7 @@ import time
 import requests
 import numpy as np
 import pandas as pd
-import pandas-ta as ta
+import pandas_ta as ta
 from vnstock import stock_historical_data
 from datetime import datetime, timedelta
 
