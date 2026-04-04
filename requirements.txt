@@ -1,5 +1,8 @@
-requests==2.31.0
-numpy==1.26.4
-pandas==2.2.1
-pandas-ta==0.3.14b0
-vnstock==0.2.8.6
+requests==2.33.1    # Python HTTP library (nêu ví dụ phiên bản mới nhất)【37†L27-L35】
+numpy==1.26.0       # Numpy hỗ trợ Python 3.9–3.12【40†L192-L200】
+pandas==3.0.0       # Pandas 3.x (hỗ trợ Python 3.10+)
+pandas-ta==0.2.45b  # Pandas TA (chỉ báo kỹ thuật ổn định)【35†L352-L360】
+vnstock==3.5.0      # Thư viện dữ liệu chứng khoán VN【4†L683-L690】
+
+# thinh-vu/vnstock quy định Python >=3.7【2†L61-L64】【4†L683-L690】
+# requests 2.33.1 yêu cầu Python >=3.10【37†L73-L81】
