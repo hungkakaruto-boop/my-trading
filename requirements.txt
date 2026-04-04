@@ -1,2 +1,2 @@
-pandas_ta
-requests==2.31.0
+requests
+pandas-ta
