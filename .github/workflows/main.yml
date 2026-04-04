@@ -2,10 +2,14 @@ name: VN Stock Scanner v3.0
 
 on:
   schedule:
-    # Chạy lúc 08:15 UTC (tức 15:15 giờ Việt Nam) từ Thứ 2 đến Thứ 6
-    - cron: '15 8 * * 1-5'
+    # Lịch chạy theo giờ UTC (Giờ Việt Nam - 7 tiếng). Chạy từ Thứ 2 đến Thứ 6 (1-5).
+    - cron: '30 3 * * 1-5'  # Tương ứng 10:30 sáng VN
+    - cron: '30 4 * * 1-5'  # Tương ứng 11:30 sáng VN
+    - cron: '30 6 * * 1-5'  # Tương ứng 13:30 chiều VN
+    - cron: '30 7 * * 1-5'  # Tương ứng 14:30 chiều VN
+    - cron: '0 8 * * 1-5'   # Tương ứng 15:00 chiều VN
   
-  # Cho phép bấm nút "Run workflow" chạy thủ công bất cứ lúc nào
+  # Nút bấm thủ công (phòng khi anh muốn quét test bất cứ lúc nào)
   workflow_dispatch: 
 
 jobs:
@@ -19,8 +23,8 @@ jobs:
     - name: Set up Python 3.10
       uses: actions/setup-python@v5
       with:
-        python-version: '3.9'
-        cache: 'pip' # Tăng tốc độ cài đặt ở các lần chạy sau
+        python-version: '3.10' # Ép cứng bản 3.10 để tương thích với pandas-ta và vnstock
+        cache: 'pip'           # Lưu cache để các lần chạy sau cài đặt nhanh hơn
 
     - name: Install Dependencies
       run: |
@@ -29,7 +33,7 @@ jobs:
 
     - name: Run Scanner Script
       env:
-        # Lấy Token và Chat ID từ GitHub Secrets
+        # Lấy Key từ phần Settings > Secrets của GitHub
         TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
         TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
       run: |
