@@ -1,6 +1,1 @@
-pandas==2.2.2
-numpy==1.26.4
-requests==2.31.0
-vnstock==0.2.9
-
-git+https://github.com/twopirllc/pandas-ta.git
+pandas-ta
