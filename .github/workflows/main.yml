@@ -1,40 +1,32 @@
-name: VN Stock Scanner v3.0
+name: CI
 
 on:
+  push:
+    branches: [ main ]
   schedule:
-    # Lịch chạy theo giờ UTC (Giờ Việt Nam - 7 tiếng). Chạy từ Thứ 2 đến Thứ 6 (1-5).
-    - cron: '30 3 * * 1-5'  # Tương ứng 10:30 sáng VN
-    - cron: '30 4 * * 1-5'  # Tương ứng 11:30 sáng VN
-    - cron: '30 6 * * 1-5'  # Tương ứng 13:30 chiều VN
-    - cron: '30 7 * * 1-5'  # Tương ứng 14:30 chiều VN
-    - cron: '0 8 * * 1-5'   # Tương ứng 15:00 chiều VN
-  
-  # Nút bấm thủ công (phòng khi anh muốn quét test bất cứ lúc nào)
-  workflow_dispatch: 
+    - cron: '30 4 * * 1-5'     # Chạy hàng ngày từ thứ Hai đến thứ Sáu lúc 4:30 UTC【32†L889-L896】
+      timezone: 'Asia/Ho_Chi_Minh'
+
+env:
+  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
 jobs:
-  run-scanner:
+  build-and-scan:
     runs-on: ubuntu-latest
-    
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
-
-    - name: Set up Python 3.10
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10' # Ép cứng bản 3.10 để tương thích với pandas-ta và vnstock
-        cache: 'pip'           # Lưu cache để các lần chạy sau cài đặt nhanh hơn
-
-    - name: Install Dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Run Scanner Script
-      env:
-        # Lấy Key từ phần Settings > Secrets của GitHub
-        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-      run: |
-        python scanner.py
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt - name: Lint with flake8
+        run: |
+          pip install flake8
+          flake8 . --count --statistics
+      - name: Run Scanner Script
+        run: |
+          python scanner.py
