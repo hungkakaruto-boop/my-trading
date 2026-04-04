@@ -20,7 +20,7 @@ import requests
 import numpy as np
 import pandas as pd
 import pandas_ta as ta
-from Vnstock3 import vnstock
+from vnstock3 import vnstock
 from datetime import datetime, timedelta
 
 
