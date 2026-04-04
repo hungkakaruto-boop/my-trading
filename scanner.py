@@ -79,7 +79,7 @@ def send_telegram(message: str, retries: int = 3):
 # ===========================================================================
 def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D') -> pd.DataFrame | None:
     try:
-        df = stock_historical_data(
+        df = stock.stock_historical_data(
             symbol=ticker, start_date=start, end_date=end,
             resolution=resolution, type='stock'
         )
