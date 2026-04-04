@@ -1,32 +1,36 @@
-name: Super Stock Scanner Bot
+name: VN Stock Scanner v3.0
 
 on:
   schedule:
-    # Chạy mỗi 30 phút trong phiên giao dịch (VN), Thứ 2 đến Thứ 6
-    # 9:00 - 11:30 AM (VN) -> 2:00 - 4:30 AM (UTC)
-    # 1:00 - 3:00 PM (VN) -> 6:00 - 8:00 AM (UTC)
-    - cron: '*/30 2-4 * * 1-5'
-    - cron: '*/30 6-8 * * 1-5'
-  workflow_dispatch:
+    # Chạy lúc 08:15 UTC (tức 15:15 giờ Việt Nam) từ Thứ 2 đến Thứ 6
+    - cron: '15 8 * * 1-5'
+  
+  # Cho phép bấm nút "Run workflow" chạy thủ công bất cứ lúc nào
+  workflow_dispatch: 
 
 jobs:
-  build:
+  run-scanner:
     runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-          
-      - name: Install dependencies
-        run: |
-          pip install --upgrade pip
-          pip install pandas pandas_ta requests vnstock
-      - name: Run Bot
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python bot.py
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+        cache: 'pip' # Tăng tốc độ cài đặt ở các lần chạy sau
+
+    - name: Install Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    - name: Run Scanner Script
+      env:
+        # Lấy Token và Chat ID từ GitHub Secrets
+        TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+        TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      run: |
+        python scanner.py
