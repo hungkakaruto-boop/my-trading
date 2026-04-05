@@ -29,6 +29,8 @@ from datetime import datetime, timedelta
 # ===========================================================================
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID   = os.getenv('TELEGRAM_CHAT_ID')
+VNSTOCK_API_KEY = os.getenv('VNSTOCK_API_KEY', '')   # ← dán key vào đây nếu cần
+
 
 MIN_RR_RATIO      = 2.5   # R:R tối thiểu (giữ nguyên cho swing T+10-14)
 MAX_SL_PCT        = 0.05  # SL không sâu hơn 5%
