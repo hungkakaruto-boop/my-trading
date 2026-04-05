@@ -14,6 +14,8 @@ NÂNG CẤP so với v2:
 =============================================================================
 """
 
+from __future__ import annotations  # FIX #3: hỗ trợ type hint X | Y trên Python 3.9
+
 import os
 import time
 import requests
@@ -22,6 +24,7 @@ import pandas as pd
 import pandas_ta as ta
 from vnstock import Vnstock
 from datetime import datetime, timedelta
+from typing import Optional
 
 
 # ===========================================================================
@@ -29,8 +32,10 @@ from datetime import datetime, timedelta
 # ===========================================================================
 TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 TELEGRAM_CHAT_ID   = os.getenv('TELEGRAM_CHAT_ID')
-VNSTOCK_API_KEY = os.getenv('VNSTOCK_API_KEY', '')   # ← dán key vào đây nếu cần
+VNSTOCK_API_KEY    = os.getenv('VNSTOCK_API_KEY', '')   # ← dán key vào đây nếu cần
 
+# FIX #2: Khai báo DEBUG_MODE — THIẾU BIẾN NÀY GÂY NameError TOÀN BỘ CHƯƠNG TRÌNH
+DEBUG_MODE = False   # ← Đổi thành True để xem log chi tiết khi debug
 
 MIN_RR_RATIO      = 2.5   # R:R tối thiểu (giữ nguyên cho swing T+10-14)
 MAX_SL_PCT        = 0.05  # SL không sâu hơn 5%
@@ -56,18 +61,17 @@ MCDX_THRESH_2 = 70  # +2 điểm
 
 
 WATCHLIST = [
-    "ACB", "BID", "CTG", "HDB", "LPB", "MBB", "MSB", "OCB", "SHB", "STB", "TCB", "TPB", "VCB", "VIB", "VPB", 
-    "BAB", "EIB", "NAB", "SSB", "VBB", "VIC", "VHM", "VRE", "BCM", "NVL", "PDR", "DIG", "DXG", "KDH", "NLG", 
-    "KBC", "SZC", "IDC", "VGC", "ITA", "CEO", "TCH", "KHG", "HDG", "DXS", "AGG", "CRE", "QCG", "NTL", "SJS", 
-    "SSI", "VND", "VCI", "HCM", "VIX", "SHS", "FTS", "MBS", "BSI", "CTS", "AGR", "ORS", "TVS", "VDS", "BVS", 
-    "HPG", "HSG", "NKG", "VGS", "POM", "TLH", "SMC", "HT1", "BCC", "BMP", "VCS", "GAS", "PLX", "PVS", "PVD", 
-    "PVT", "BSR", "POW", "GEG", "PC1", "REE", "TV2", "NT2", "BCG", "ASM", "MWG", "MSN", "VNM", "PNJ", "FRT", 
-    "DGW", "PET", "SAB", "KDC", "DBC", "ANV", "IDI", "FPT", "CMG", "CTR", "VGI", "ELC", "FOX", "SAM", "LCW", 
-    "GVR", "DGC", "DCM", "DPM", "PHR", "DPR", "CSV", "LAS", "BFC", "AAA", "GMD", "HAH", "VSC", "VOS", "VIP", 
-    "SGP", "VNA", "PHP", "TMS", "VCG", "LCG", "HHV", "FCN", "C4G", "HBC", "CTD", "CII", "NBB", "DPG", "HUT", 
+    "ACB", "BID", "CTG", "HDB", "LPB", "MBB", "MSB", "OCB", "SHB", "STB", "TCB", "TPB", "VCB", "VIB", "VPB",
+    "BAB", "EIB", "NAB", "SSB", "VBB", "VIC", "VHM", "VRE", "BCM", "NVL", "PDR", "DIG", "DXG", "KDH", "NLG",
+    "KBC", "SZC", "IDC", "VGC", "ITA", "CEO", "TCH", "KHG", "HDG", "DXS", "AGG", "CRE", "QCG", "NTL", "SJS",
+    "SSI", "VND", "VCI", "HCM", "VIX", "SHS", "FTS", "MBS", "BSI", "CTS", "AGR", "ORS", "TVS", "VDS", "BVS",
+    "HPG", "HSG", "NKG", "VGS", "POM", "TLH", "SMC", "HT1", "BCC", "BMP", "VCS", "GAS", "PLX", "PVS", "PVD",
+    "PVT", "BSR", "POW", "GEG", "PC1", "REE", "TV2", "NT2", "BCG", "ASM", "MWG", "MSN", "VNM", "PNJ", "FRT",
+    "DGW", "PET", "SAB", "KDC", "DBC", "ANV", "IDI", "FPT", "CMG", "CTR", "VGI", "ELC", "FOX", "SAM", "LCW",
+    "GVR", "DGC", "DCM", "DPM", "PHR", "DPR", "CSV", "LAS", "BFC", "AAA", "GMD", "HAH", "VSC", "VOS", "VIP",
+    "SGP", "VNA", "PHP", "TMS", "VCG", "LCG", "HHV", "FCN", "C4G", "HBC", "CTD", "CII", "NBB", "DPG", "HUT",
     "G36", "HAG", "HNG", "TNG", "MSH", "VGT", "TCM", "GIL", "PAN", "LTG", "NSC"
 ]
-
 
 
 # ===========================================================================
@@ -84,19 +88,19 @@ def send_telegram(message: str, retries: int = 3) -> bool:
         except Exception as e:
             print(f"  [Telegram retry {attempt+1}] {e}")
             time.sleep(2)
- return False
+    return False  # FIX #1: thụt lề đúng 4 dấu cách (cũ: 1 dấu cách → IndentationError)
 
 
 # ===========================================================================
 # MODULE 1: LẤY DỮ LIỆU
 # ===========================================================================
 def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
-                max_retries: int = 4) -> pd.DataFrame | None:
+                max_retries: int = 4) -> Optional[pd.DataFrame]:
     """
     Lấy OHLCV từ vnstock.
     resolution : '1D' | '60' (H1) | '15' (M15)
 
-    🔧 FIX #1: VCI không hỗ trợ intraday → dùng TCBS cho mọi khung < D1.
+    🔧 FIX: VCI không hỗ trợ intraday → dùng TCBS cho mọi khung < D1.
       - VCI  → D1 của cổ phiếu thường (tốt hơn về lịch sử)
       - TCBS → tất cả intraday (H1, M15) + index (VNINDEX, VN30...)
     """
@@ -105,7 +109,6 @@ def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
     is_index    = ticker.upper() in ('VNINDEX', 'VN30', 'HNX', 'UPCOM')
     is_intraday = resolution not in ('1D', 'D', '1W', 'W')
 
-    # ── KEY FIX: TCBS cho mọi intraday và index ───────────────────────────
     source = 'TCBS' if (is_index or is_intraday) else 'VCI'
 
     for attempt in range(max_retries):
@@ -263,7 +266,7 @@ def nearest_fib_label(price: float, fibs: dict) -> str:
 # ===========================================================================
 # MODULE 5: ORDER BLOCK (H1)
 # ===========================================================================
-def find_bullish_ob(df: pd.DataFrame, lookback: int = 60) -> dict | None:
+def find_bullish_ob(df: pd.DataFrame, lookback: int = 60) -> Optional[dict]:
     s = df.tail(lookback).reset_index(drop=True)
     for i in range(len(s) - 3, 1, -1):
         c, n = s.iloc[i], s.iloc[i + 1]
@@ -377,12 +380,14 @@ def detect_reversal(df: pd.DataFrame) -> dict:
                 and last['close'] > prev['open'] and last['open'] < prev['close']):
             result['engulfing'] = True
     return result
-                               
- 
+
+
+# FIX #4: Đã xoá dòng trắng có ký tự khoảng trắng thừa ở đây
+
 # ===========================================================================
 # MODULE 11: TÍNH SL/TP
 # ===========================================================================
-def calc_trade(price: float, ob: dict | None, fibs: dict, scenario: str) -> dict:
+def calc_trade(price: float, ob: Optional[dict], fibs: dict, scenario: str) -> dict:
     if scenario == 'UPTREND':
         sl = price * 0.96
         if ob and ob['ob_low'] > price * 0.93:
@@ -420,7 +425,7 @@ def calc_trade(price: float, ob: dict | None, fibs: dict, scenario: str) -> dict
 # MODULE 12: PHÂN TÍCH CHÍNH — D1 → H1 → M15
 # ===========================================================================
 def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
-            end: str, market: dict) -> dict | None:
+            end: str, market: dict) -> Optional[dict]:
     """
     Trả về dict nếu đạt tiêu chuẩn, None nếu không.
     'approaching' = True nếu mã tiệm cận nhưng chưa đủ điều kiện.
@@ -431,8 +436,7 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
         df_h1  = fetch_ohlcv(ticker, start_h1,  end, '60')
         df_m15 = fetch_ohlcv(ticker, start_m15, end, '15')
 
-        # ── 🔧 DEBUG LOG (MODULE 1 — Kiểm tra dữ liệu tải về) ────────────────
-        # Đặt DEBUG_MODE = False ở đầu file để tắt khi chạy production
+        # ── DEBUG LOG (MODULE 1 — Kiểm tra dữ liệu tải về) ──────────────────
         if DEBUG_MODE:
             d1_len  = len(df_d1)  if df_d1  is not None else "❌None"
             h1_len  = len(df_h1)  if df_h1  is not None else "❌None"
@@ -441,7 +445,6 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
                   f" | H1:{str(h1_len):>5} nến"
                   f" | M15:{str(m15_len):>5} nến"
                   f" | source D1=VCI / H1,M15=TCBS")
-        # ─────────────────────────────────────────────────────────────────────
 
         if df_d1 is None or len(df_d1) < 55:
             if DEBUG_MODE:
@@ -744,6 +747,8 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
                     f"   ⚖️  R:R               : 1:{t['rr1']}\n"
                     f"   💡 <i>Bán ngay khi chạm EMA21. NO Margin tuyệt đối.</i>"
                 )
+            elif is_approaching:
+                scenario = 'DOWNTREND'
 
         if scenario is None:
             return None
@@ -925,4 +930,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+
+
                           
