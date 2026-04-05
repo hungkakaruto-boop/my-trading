@@ -68,8 +68,6 @@ WATCHLIST = [
     "G36", "HAG", "HNG", "TNG", "MSH", "VGT", "TCM", "GIL", "PAN", "LTG", "NSC"
 ]
 
-# Khởi tạo vnstock (global, dùng chung toàn bộ script)
-stock = Vnstock().stock(symbol='ACB', source='KBS')
 
 
 # ===========================================================================
@@ -95,19 +93,24 @@ def send_telegram(message: str, retries: int = 3) -> bool:
 def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
                 max_retries: int = 4) -> pd.DataFrame | None:
     """
-    Lấy OHLCV từ vnstock.
-    resolution : '1D' | '60' (H1) | '15' (M15)
-    max_retries: tự động chờ & thử lại khi bị rate limit (429)
+    VCI  → chỉ dùng cho D1 (cổ phiếu thường).
+    TCBS → dùng cho tất cả intraday (H1='60', M15='15') VÀ index (VNINDEX...).
     """
-    wait_times = [10, 20, 40, 60]   # giây chờ (giây) sau mỗi lần bị chặn
+    wait_times = [10, 20, 40, 60]
+
+    is_index    = ticker.upper() in ('VNINDEX', 'VN30', 'HNX', 'UPCOM')
+    is_intraday = resolution not in ('1D', 'D', '1W', 'W')   # ← KEY FIX
+
+    # VCI không hỗ trợ intraday → dùng TCBS cho mọi khung < D1
+    source = 'TCBS' if (is_index or is_intraday) else 'VCI'
 
     for attempt in range(max_retries):
         try:
-            # Truyền api_key nếu có — tăng rate limit từ 20 lên 60+/phút
-            client = Vnstock() 
-            _stock = client.stock(symbol=ticker, source='KBS')
+            client = (Vnstock(api_key=VNSTOCK_API_KEY)
+                      if VNSTOCK_API_KEY else Vnstock())
+            _stock = client.stock(symbol=ticker, source=source)
             df = _stock.quote.history(
-                symbol=ticker, start=start, end=end,
+                start=start, end=end,
                 interval=resolution
             )
 
@@ -120,7 +123,9 @@ def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
                 df.columns[0]
             )
             df[time_col] = pd.to_datetime(df[time_col])
-            df = df.rename(columns={time_col: 'time'}).set_index('time').sort_index()
+            df = (df.rename(columns={time_col: 'time'})
+                    .set_index('time')
+                    .sort_index())
             for col in ['open', 'high', 'low', 'close', 'volume']:
                 if col in df.columns:
                     df[col] = pd.to_numeric(df[col], errors='coerce')
@@ -129,21 +134,18 @@ def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
 
         except Exception as e:
             err_str = str(e).lower()
-            # Phát hiện Rate Limit (HTTP 429 hoặc thông báo tiếng Việt/Anh)
-            is_rate_limit = ('429' in err_str
-                             or 'rate limit' in err_str
-                             or 'too many' in err_str
-                             or 'giới hạn' in err_str)
+            is_rate_limit = any(k in err_str for k in
+                                ('429', 'rate limit', 'too many', 'giới hạn'))
             if is_rate_limit and attempt < max_retries - 1:
                 wait = wait_times[attempt]
                 print(f"  ⏳ Rate limit [{ticker} {resolution}] "
                       f"— chờ {wait}s (lần {attempt+1}/{max_retries})")
                 time.sleep(wait)
             else:
-                print(f"  [Fetch] {ticker} {resolution}: {e}")
+                print(f"  [Fetch] {ticker} {resolution} ({source}): {e}")
                 return None
 
-    return None   # hết số lần thử
+    return None
 
 # ===========================================================================
 # MODULE 2: BỘ LỌC VN-INDEX + RELATIVE STRENGTH
