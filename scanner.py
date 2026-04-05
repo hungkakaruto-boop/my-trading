@@ -84,7 +84,7 @@ def send_telegram(message: str, retries: int = 3) -> bool:
         except Exception as e:
             print(f"  [Telegram retry {attempt+1}] {e}")
             time.sleep(2)
-return False
+ return False
 
 
 # ===========================================================================
