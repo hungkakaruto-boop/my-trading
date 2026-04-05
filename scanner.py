@@ -73,7 +73,7 @@ WATCHLIST = [
 # ===========================================================================
 # TELEGRAM
 # ===========================================================================
-def send_telegram(message: str, retries: int = 3) -> bool:
+ def send_telegram(message: str, retries: int = 3) -> bool:
     url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
     for attempt in range(retries):
@@ -93,15 +93,19 @@ def send_telegram(message: str, retries: int = 3) -> bool:
 def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
                 max_retries: int = 4) -> pd.DataFrame | None:
     """
-    VCI  → chỉ dùng cho D1 (cổ phiếu thường).
-    TCBS → dùng cho tất cả intraday (H1='60', M15='15') VÀ index (VNINDEX...).
+    Lấy OHLCV từ vnstock.
+    resolution : '1D' | '60' (H1) | '15' (M15)
+
+    🔧 FIX #1: VCI không hỗ trợ intraday → dùng TCBS cho mọi khung < D1.
+      - VCI  → D1 của cổ phiếu thường (tốt hơn về lịch sử)
+      - TCBS → tất cả intraday (H1, M15) + index (VNINDEX, VN30...)
     """
     wait_times = [10, 20, 40, 60]
 
     is_index    = ticker.upper() in ('VNINDEX', 'VN30', 'HNX', 'UPCOM')
-    is_intraday = resolution not in ('1D', 'D', '1W', 'W')   # ← KEY FIX
+    is_intraday = resolution not in ('1D', 'D', '1W', 'W')
 
-    # VCI không hỗ trợ intraday → dùng TCBS cho mọi khung < D1
+    # ── KEY FIX: TCBS cho mọi intraday và index ───────────────────────────
     source = 'TCBS' if (is_index or is_intraday) else 'VCI'
 
     for attempt in range(max_retries):
@@ -142,10 +146,11 @@ def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
                       f"— chờ {wait}s (lần {attempt+1}/{max_retries})")
                 time.sleep(wait)
             else:
-                print(f"  [Fetch] {ticker} {resolution} ({source}): {e}")
+                print(f"  [Fetch] {ticker} {resolution} (source={source}): {e}")
                 return None
 
     return None
+
 
 # ===========================================================================
 # MODULE 2: BỘ LỌC VN-INDEX + RELATIVE STRENGTH
@@ -153,34 +158,34 @@ def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
 def get_market_regime(start: str, end: str) -> dict:
     """
     Phân tích VN-Index:
-    BULL   → Long tự do
+    BULL    → Long tự do
     NEUTRAL → Long chọn lọc
-    BEAR   → Chỉ Long nếu RS mã > RS_MIN_BEAR, hoặc bắt sóng hồi
+    BEAR    → Chỉ Long nếu RS mã > RS_MIN_BEAR
     """
     default = {
         'regime': 'NEUTRAL', 'allow_long': True,
         'vnindex_price': 0, 'rsi': 50, 'ma20': 0, 'ma50': 0,
         'vnindex_ret20': 0.0
     }
-    # fetch_ohlcv tự chọn source=TCBS cho VNINDEX
     df = fetch_ohlcv('VNINDEX', start, end, '1D')
     if df is None or df.empty or len(df) < 55:
-        print("  [Market] Không lấy được VNINDEX — dùng NEUTRAL mặc định (allow_long=True)")
-        return default   # NEUTRAL → vẫn cho phép quét, không chặn toàn bộ
+        print("  [Market] Không lấy được VNINDEX — dùng NEUTRAL mặc định")
+        return default
     try:
         df['ma20'] = ta.sma(df['close'], length=20)
         df['ma50'] = ta.sma(df['close'], length=50)
         df['rsi']  = ta.rsi(df['close'], length=14)
         latest = df.iloc[-1]
-        p, m20, m50, rsi = latest['close'], latest['ma20'], latest['ma50'], latest['rsi']
+        p, m20, m50, rsi = (latest['close'], latest['ma20'],
+                            latest['ma50'], latest['rsi'])
 
-        # Tỷ suất sinh lợi 20 phiên của VN-Index (dùng tính RS)
-        ret20 = (p / df['close'].iloc[-RS_LOOKBACK - 1] - 1) if len(df) > RS_LOOKBACK + 1 else 0.0
+        ret20 = ((p / df['close'].iloc[-RS_LOOKBACK - 1] - 1)
+                 if len(df) > RS_LOOKBACK + 1 else 0.0)
 
         if p > m20 and p > m50 and m20 > m50:
             regime, allow = 'BULL', True
         elif p < m20 * 0.95 and p < m50:
-            regime, allow = 'BEAR', False   # RS riêng lẻ quyết định sau
+            regime, allow = 'BEAR', False
         else:
             regime, allow = 'NEUTRAL', True
 
@@ -195,38 +200,28 @@ def get_market_regime(start: str, end: str) -> dict:
         return default
 
 
-def send_telegram(message: str, retries: int = 3) -> bool:
-    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
-    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
-    for attempt in range(retries):
-        try:
-            r = requests.post(url, json=payload, timeout=15)
-            r.raise_for_status()
-            return True
-        except Exception as e:
-            print(f"  [Telegram retry {attempt+1}] {e}")
-            time.sleep(2)
-    return False
+def calc_relative_strength(df_stock: pd.DataFrame, vnindex_ret20: float) -> float:
+    if len(df_stock) < RS_LOOKBACK + 2 or vnindex_ret20 == 0:
+        return 1.0
+    stock_ret = (df_stock['close'].iloc[-1]
+                 / df_stock['close'].iloc[-RS_LOOKBACK - 1] - 1)
+    if abs(vnindex_ret20) < 0.001:
+        return 1.0 if stock_ret >= 0 else 0.5
+    return round(stock_ret / abs(vnindex_ret20), 3)
+
 
 # ===========================================================================
 # MODULE 3: MCDX BANKER (Bonus Score)
 # ===========================================================================
 def calc_mcdx_banker(df: pd.DataFrame, length: int = 14) -> float:
-    """
-    MCDX Banker — đo tỷ lệ mua ròng của dòng tiền lớn.
-    Công thức: % khối lượng mua (phiên tăng) / tổng khối lượng trong N phiên.
-    Ngưỡng:
-      > MCDX_THRESH_1 (55%) → +1 điểm
-      > MCDX_THRESH_2 (70%) → +2 điểm (Big Money rõ ràng)
-    Ghi chú: Đây là proxy đơn giản của MCDX thực; phản ánh volume-buying pressure.
-    """
     if len(df) < length + 2:
         return 50.0
     delta  = df['close'].diff()
     up_vol = df['volume'].where(delta > 0, 0.0)
     rolling_up  = up_vol.rolling(length).sum()
     rolling_tot = df['volume'].rolling(length).sum()
-    mcdx = (rolling_up / rolling_tot * 100).replace([np.inf, -np.inf], np.nan).fillna(50)
+    mcdx = (rolling_up / rolling_tot * 100).replace(
+        [np.inf, -np.inf], np.nan).fillna(50)
     return round(float(mcdx.iloc[-1]), 1)
 
 
@@ -251,7 +246,6 @@ def in_ote_zone(price: float, fibs: dict) -> bool:
 
 
 def dist_to_ote(price: float, fibs: dict) -> float:
-    """Khoảng cách % từ giá hiện tại đến rìa gần nhất của OTE."""
     if price > fibs['ote_high']:
         return (price - fibs['ote_high']) / price
     if price < fibs['ote_low']:
@@ -266,15 +260,10 @@ def nearest_fib_label(price: float, fibs: dict) -> str:
     return labels[closest]
 
 
-# =========l==================================================================
-# MODULE 5: ORDER BLOCK (H1) — thay thế H4
+# ===========================================================================
+# MODULE 5: ORDER BLOCK (H1)
 # ===========================================================================
 def find_bullish_ob(df: pd.DataFrame, lookback: int = 60) -> dict | None:
-    """
-    Bullish OB trên H1: Nến đỏ cuối cùng ngay trước displacement tăng + BOS xác nhận.
-    Tăng lookback lên 60 (H1) để bù cho việc không còn dùng H4.
-    Ngưỡng displacement: 0.4% (thay vì 0.6% trên H4) vì biên độ H1 nhỏ hơn.
-    """
     s = df.tail(lookback).reset_index(drop=True)
     for i in range(len(s) - 3, 1, -1):
         c, n = s.iloc[i], s.iloc[i + 1]
@@ -294,7 +283,6 @@ def find_bullish_ob(df: pd.DataFrame, lookback: int = 60) -> dict | None:
 
 
 def dist_to_ob(price: float, ob: dict) -> float:
-    """Khoảng cách % từ giá đến rìa gần nhất của OB (0 nếu đang trong OB)."""
     if ob['ob_low'] <= price <= ob['ob_high']:
         return 0.0
     if price > ob['ob_high']:
@@ -306,7 +294,6 @@ def dist_to_ob(price: float, ob: dict) -> float:
 # MODULE 6: FAIR VALUE GAP (H1)
 # ===========================================================================
 def find_bullish_fvg(df: pd.DataFrame, lookback: int = 50) -> list:
-    """FVG Bullish trên H1: low[i+1] > high[i-1]."""
     fvgs, current = [], df['close'].iloc[-1]
     s = df.tail(lookback + 2).reset_index(drop=True)
     for i in range(1, len(s) - 1):
@@ -326,11 +313,6 @@ def find_bullish_fvg(df: pd.DataFrame, lookback: int = 50) -> list:
 # MODULE 7: BOS / CHoCH (H1)
 # ===========================================================================
 def detect_structure(df: pd.DataFrame, lookback: int = 40) -> dict:
-    """
-    BOS Bullish = Higher High xác nhận → uptrend tiếp diễn
-    CHoCH Bearish = Lower Low trong uptrend → cảnh báo đảo chiều
-    HH-HL = cấu trúc khoẻ mạnh nhất
-    """
     s = df.tail(lookback)
     highs, lows = s['high'].values, s['low'].values
     sh, sl = [], []
@@ -350,14 +332,9 @@ def detect_structure(df: pd.DataFrame, lookback: int = 40) -> dict:
 
 
 # ===========================================================================
-# MODULE 8: LIQUIDITY SWEEP (M15) — chuyển từ H1 xuống M15
+# MODULE 8: LIQUIDITY SWEEP (M15)
 # ===========================================================================
 def detect_sweep(df: pd.DataFrame, lookback: int = 24) -> dict:
-    """
-    Bullish Sweep trên M15: Râu dưới xuyên đáy cũ nhưng đóng cửa lại bên trên.
-    Dùng M15 thay H1 để bắt timing entry chính xác hơn.
-    lookback=24 ≈ 6 tiếng giao dịch (~ 1.5 phiên).
-    """
     s = df.tail(lookback).reset_index(drop=True)
     prev_low = s['low'].iloc[:-3].min()
     last = s.iloc[-1]
@@ -367,13 +344,9 @@ def detect_sweep(df: pd.DataFrame, lookback: int = 24) -> dict:
 
 
 # ===========================================================================
-# MODULE 9: VOLUME DRY-UP & SPIKE (H1)
+# MODULE 9: VOLUME DRY-UP & SPIKE
 # ===========================================================================
 def vol_dryup(df: pd.DataFrame, window: int = 6, threshold: float = 0.65) -> bool:
-    """
-    Volume cạn dần trong N phiên H1 → phe bán yếu dần.
-    window=6 H1 ≈ 1.5 phiên giao dịch VN.
-    """
     if len(df) < 25:
         return False
     ma20   = df['volume'].tail(25).mean()
@@ -382,7 +355,6 @@ def vol_dryup(df: pd.DataFrame, window: int = 6, threshold: float = 0.65) -> boo
 
 
 def vol_spike(df: pd.DataFrame, mult: float = 1.5) -> bool:
-    """Volume nến M15/H1 cuối vượt trội TB → dòng tiền xác nhận."""
     if len(df) < 25:
         return False
     ma20 = df['volume'].tail(25).mean()
@@ -390,13 +362,9 @@ def vol_spike(df: pd.DataFrame, mult: float = 1.5) -> bool:
 
 
 # ===========================================================================
-# MODULE 10: NẾN ĐẢO CHIỀU (M15) — chuyển từ H1 xuống M15
+# MODULE 10: NẾN ĐẢO CHIỀU (M15)
 # ===========================================================================
 def detect_reversal(df: pd.DataFrame) -> dict:
-    """
-    Pinbar Bullish và Engulfing Bullish trên M15 (entry timing).
-    Ngưỡng thân nến thoải hơn M15 (35% → 40%) vì biên độ nhỏ hơn.
-    """
     last, prev = df.iloc[-1], df.iloc[-2]
     body  = abs(last['close'] - last['open'])
     rng   = last['high'] - last['low']
@@ -409,17 +377,12 @@ def detect_reversal(df: pd.DataFrame) -> dict:
                 and last['close'] > prev['open'] and last['open'] < prev['close']):
             result['engulfing'] = True
     return result
-
-
+                               
+ 
 # ===========================================================================
 # MODULE 11: TÍNH SL/TP
 # ===========================================================================
 def calc_trade(price: float, ob: dict | None, fibs: dict, scenario: str) -> dict:
-    """
-    SL: bám sát cấu trúc (OB, đáy gần nhất), giới hạn tối đa 5%.
-    TP: dựa Fibonacci Extension, tối thiểu 10%.
-    Hợp lệ khi R:R >= 2.5.
-    """
     if scenario == 'UPTREND':
         sl = price * 0.96
         if ob and ob['ob_low'] > price * 0.93:
@@ -468,7 +431,21 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
         df_h1  = fetch_ohlcv(ticker, start_h1,  end, '60')
         df_m15 = fetch_ohlcv(ticker, start_m15, end, '15')
 
+        # ── 🔧 DEBUG LOG (MODULE 1 — Kiểm tra dữ liệu tải về) ────────────────
+        # Đặt DEBUG_MODE = False ở đầu file để tắt khi chạy production
+        if DEBUG_MODE:
+            d1_len  = len(df_d1)  if df_d1  is not None else "❌None"
+            h1_len  = len(df_h1)  if df_h1  is not None else "❌None"
+            m15_len = len(df_m15) if df_m15 is not None else "❌None"
+            print(f"    📊 {ticker:<6} | D1:{str(d1_len):>6} nến"
+                  f" | H1:{str(h1_len):>5} nến"
+                  f" | M15:{str(m15_len):>5} nến"
+                  f" | source D1=VCI / H1,M15=TCBS")
+        # ─────────────────────────────────────────────────────────────────────
+
         if df_d1 is None or len(df_d1) < 55:
+            if DEBUG_MODE:
+                print(f"    ⛔ {ticker} — bỏ qua: D1 không đủ dữ liệu")
             return None
 
         # ── Chỉ báo D1 ───────────────────────────────────────────────────────
@@ -497,24 +474,30 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
         else:
             trend = 'SIDEWAYS'
 
-        # ── Relative Strength vs VN-Index ────────────────────────────────────
+        if DEBUG_MODE:
+            print(f"    📈 {ticker} — Giá:{price:.2f}"
+                  f" | MA20:{ma20:.2f} | MA50:{ma50:.2f}"
+                  f" | Xu hướng: {trend}")
+
+        # ── Relative Strength ─────────────────────────────────────────────────
         rs = calc_relative_strength(df_d1, market['vnindex_ret20'])
 
-        # Nếu thị trường BEAR: chỉ cho Long nếu RS đủ mạnh
         if not market['allow_long'] and trend == 'UPTREND' and rs < RS_MIN_BEAR:
+            if DEBUG_MODE:
+                print(f"    ⛔ {ticker} — BEAR filter: RS={rs:.2f} < {RS_MIN_BEAR}")
             return None
         if not market['allow_long'] and trend == 'SIDEWAYS':
             return None
 
-        # ── MCDX Banker (D1, dùng chung toàn bộ phân tích) ──────────────────
+        # ── MCDX Banker ───────────────────────────────────────────────────────
         mcdx_d1 = calc_mcdx_banker(df_d1, length=14)
 
-        # ── Phân tích H1 — OB / FVG / Structure / Volume ────────────────────
+        # ── Phân tích H1 ─────────────────────────────────────────────────────
         ob_h1, fvg_h1 = None, []
         struct_h1 = {'bos_bull': False, 'choch_bear': False, 'hh_hl': False,
                      'last_sh': 0, 'last_sl': 0}
-        dry_h1 = False
-        rsi_h1 = np.nan
+        dry_h1   = False
+        rsi_h1   = np.nan
         ema21_h1 = np.nan
 
         if df_h1 is not None and len(df_h1) >= 30:
@@ -527,7 +510,21 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
             struct_h1 = detect_structure(df_h1, lookback=40)
             dry_h1   = vol_dryup(df_h1, window=6, threshold=0.65)
 
-        # ── Phân tích M15 — Sweep / Reversal / Spike (timing entry) ─────────
+            if DEBUG_MODE:
+                ob_str = (f"{ob_h1['ob_low']}-{ob_h1['ob_high']}"
+                          if ob_h1 else "None")
+                print(f"    🕐 {ticker} H1 — RSI:{rsi_h1:.0f}"
+                      f" | EMA21:{ema21_h1:.2f}"
+                      f" | OB:{ob_str}"
+                      f" | FVG:{len(fvg_h1)}cái"
+                      f" | HH-HL:{struct_h1['hh_hl']}"
+                      f" | DryUp:{dry_h1}")
+        else:
+            if DEBUG_MODE:
+                reason = "None" if df_h1 is None else f"chỉ {len(df_h1)} nến (<30)"
+                print(f"    ⚠️  {ticker} H1 — bỏ qua phân tích H1: {reason}")
+
+        # ── Phân tích M15 ────────────────────────────────────────────────────
         sweep = {'swept': False, 'type': None, 'level': None}
         rev   = {'pinbar': False, 'engulfing': False}
         spike = False
@@ -537,7 +534,17 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
             rev   = detect_reversal(df_m15)
             spike = vol_spike(df_m15, mult=1.5)
 
-        # ── Fibonacci (60 phiên D1) ───────────────────────────────────────────
+            if DEBUG_MODE:
+                print(f"    ⏱️  {ticker} M15 — Sweep:{sweep['swept']}"
+                      f" | Pinbar:{rev['pinbar']}"
+                      f" | Engulfing:{rev['engulfing']}"
+                      f" | Spike:{spike}")
+        else:
+            if DEBUG_MODE:
+                reason = "None" if df_m15 is None else f"chỉ {len(df_m15)} nến (<24)"
+                print(f"    ⚠️  {ticker} M15 — bỏ qua phân tích M15: {reason}")
+
+        # ── Fibonacci ────────────────────────────────────────────────────────
         sh60  = df_d1['high'].tail(60).max()
         sl60  = df_d1['low'].tail(60).min()
         fibs  = calc_fib(sh60, sl60)
@@ -545,15 +552,14 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
         fib_l = nearest_fib_label(price, fibs)
         zone  = "DISCOUNT ✅" if price < fibs['midpoint'] else "PREMIUM ⚠️"
 
-        # ── Khoảng cách đến vùng giá trị (dùng cho Approaching) ─────────────
+        # ── Khoảng cách đến vùng giá trị ────────────────────────────────────
         d_ote = dist_to_ote(price, fibs)
         d_ob  = dist_to_ob(price, ob_h1) if ob_h1 else 1.0
-        near_value = min(d_ote, d_ob)   # % cách vùng gần nhất
+        near_value = min(d_ote, d_ob)
 
         # ── Confluence Scoring ────────────────────────────────────────────────
         score, notes = 0, []
 
-        # Cấu trúc H1
         if struct_h1['hh_hl']:
             score += 2
             notes.append("✅ HH-HL H1 — cấu trúc uptrend lành mạnh")
@@ -564,34 +570,28 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
             score -= 2
             notes.append("⚠️ CHoCH Bearish H1 — cảnh báo đảo chiều!")
 
-        # Order Block H1
         if ob_h1 and ob_h1['ob_low'] <= price <= ob_h1['ob_high']:
             score += 3
             notes.append(f"📦 Trong OB H1 [{ob_h1['ob_low']} – {ob_h1['ob_high']}]")
 
-        # FVG H1
         for fvg in fvg_h1:
             if fvg['fvg_bot'] <= price <= fvg['fvg_top']:
                 score += 2
                 notes.append(f"🕳️ Trong FVG H1 [{fvg['fvg_bot']} – {fvg['fvg_top']}]")
                 break
 
-        # EMA21 H1
         if not np.isnan(ema21_h1) and ema21_h1 * 0.985 <= price <= ema21_h1 * 1.015:
             score += 1
             notes.append(f"📌 Chạm EMA21 H1 ({ema21_h1:.2f})")
 
-        # ICT OTE (Fibonacci D1)
         if ote:
             score += 2
             notes.append(f"🎯 ICT OTE Fibo {fib_l} — vùng vào lệnh tối ưu")
 
-        # Liquidity Sweep M15
         if sweep['swept'] and sweep['type'] == 'BULL_SWEEP':
             score += 3
             notes.append(f"💧 Liquidity Sweep Bullish M15 tại {sweep['level']}")
 
-        # Nến đảo chiều M15
         if rev['pinbar']:
             score += 2
             notes.append("🕯️ Pinbar Bullish M15")
@@ -599,17 +599,14 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
             score += 2
             notes.append("🕯️ Engulfing Bullish M15")
 
-        # Volume Dry-up H1 (Wyckoff)
         if dry_h1:
             score += 2
             notes.append("📉 Volume Dry-up H1 — cung cạn, Spring sắp nổ")
 
-        # Volume Spike M15
         if spike:
             score += 2
             notes.append("📊 Volume đột biến M15 (≥1.5× TB)")
 
-        # RSI H1
         if not np.isnan(rsi_h1):
             if trend == 'UPTREND' and 32 <= rsi_h1 <= 52:
                 score += 1
@@ -618,7 +615,6 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
                 score += 1
                 notes.append(f"📉 RSI H1 {rsi_h1:.0f} — oversold")
 
-        # ── MCDX Banker (Bonus Score) ─────────────────────────────────────────
         mcdx_bonus = 0
         if mcdx_d1 > MCDX_THRESH_2:
             mcdx_bonus = 2
@@ -628,27 +624,34 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
             notes.append(f"💰 MCDX Banker {mcdx_d1:.0f}% — Dòng tiền lớn (+1đ)")
         score += mcdx_bonus
 
-        # ── Relative Strength (Bonus) ─────────────────────────────────────────
         if rs > 1.10:
             score += 1
             notes.append(f"💪 RS {rs:.2f} — mã mạnh hơn thị trường rõ rệt (+1đ)")
         elif rs > 1.05 and not market['allow_long']:
             notes.append(f"💪 RS {rs:.2f} — vượt ngưỡng Bear filter")
 
-        # ── Đánh dấu "Tiệm cận" (Approaching) ───────────────────────────────
-        # Mã chưa đạt MIN_SMC_SCORE nhưng đang gần vùng giá trị (< 3%)
+        if DEBUG_MODE:
+            print(f"    🏆 {ticker} — Score: {score} | MCDX:{mcdx_d1:.0f}%"
+                  f" | OTE:{ote} | RS:{rs:.2f}"
+                  f" | Zone:{zone}")
+
+        # ── Đánh dấu "Tiệm cận" ──────────────────────────────────────────────
         is_approaching = (score < MIN_SMC_SCORE and near_value < 0.03
                           and not struct_h1['choch_bear'])
 
         if score < MIN_SMC_SCORE and not is_approaching:
+            if DEBUG_MODE:
+                print(f"    ⛔ {ticker} — Score {score} < {MIN_SMC_SCORE}"
+                      f", cách vùng {near_value*100:.1f}% → bỏ qua")
             return None
 
         # ── Xây dựng tín hiệu theo kịch bản ─────────────────────────────────
         scenario, signal = None, None
 
-        # KỊ CH BẢN 1: UPTREND PULLBACK
+        # KỊCH BẢN 1: UPTREND PULLBACK
         if trend == 'UPTREND':
-            near_ema = not np.isnan(ema21_h1) and ema21_h1 * 0.985 <= price <= ema21_h1 * 1.02
+            near_ema = (not np.isnan(ema21_h1)
+                        and ema21_h1 * 0.985 <= price <= ema21_h1 * 1.02)
             in_ob    = ob_h1 and ob_h1['ob_low'] <= price
             cond     = near_ema or ote or in_ob
 
@@ -672,12 +675,13 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
                         f" Chốt 50% tại TP1, trailing stop phần còn lại.</i>"
                     )
 
-        # KỊ CH BẢN 2: SIDEWAYS — ĐÁY HỘP
+        # KỊCH BẢN 2: SIDEWAYS — ĐÁY HỘP
         elif trend == 'SIDEWAYS':
             low20  = df_d1['low'].tail(20).min()
             high20 = df_d1['high'].tail(20).max()
             box_w  = (high20 - low20) / low20
-            bb_sq  = not pd.isna(d.get('bb_w', np.nan)) and d['bb_w'] < 0.05
+            bb_sq  = (not pd.isna(d.get('bb_w', np.nan))
+                      and d['bb_w'] < 0.05)
             rsi_os = not np.isnan(rsi_h1) and rsi_h1 < 38
 
             if price <= low20 * 1.03 and rsi_os and box_w > 0.07:
@@ -691,21 +695,25 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
                     return None
                 signal = (
                     f"📦 <b>SIDEWAYS — MUA ĐÁY HỘP</b>  (T+10~14 ngày)\n"
-                    f"   📏 Hộp      : {low20:.2f} – {high20:.2f}  ({box_w*100:.1f}%)\n"
-                    f"   {'🔒 BB Squeeze — năng lượng tích tụ.' + chr(10) if bb_sq else ''}"
+                    f"   📏 Hộp      : {low20:.2f} – {high20:.2f}"
+                    f"  ({box_w*100:.1f}%)\n"
+                    f"{'   🔒 BB Squeeze — năng lượng tích tụ.' + chr(10) if bb_sq else ''}"
                     f"   📉 RSI H1   : {rsi_h1:.0f}  (oversold)\n"
                     f"   💪 RS vs VNI : {rs:.2f}\n"
                     f"   💵 Vào lệnh : <b>{price:.2f}</b>  (Limit sát đáy)\n"
-                    f"   🛑 SL       : {sl_box} (-{((price-sl_box)/price*100):.1f}%)\n"
-                    f"   🎯 TP1 (50%): {tp1_box} (+{((tp1_box-price)/price*100):.1f}%)\n"
-                    f"   🎯 TP2      : {tp2_box} (+{((tp2_box-price)/price*100):.1f}%)\n"
+                    f"   🛑 SL       : {sl_box}"
+                    f" (-{((price-sl_box)/price*100):.1f}%)\n"
+                    f"   🎯 TP1 (50%): {tp1_box}"
+                    f" (+{((tp1_box-price)/price*100):.1f}%)\n"
+                    f"   🎯 TP2      : {tp2_box}"
+                    f" (+{((tp2_box-price)/price*100):.1f}%)\n"
                     f"   ⚖️  R:R     : 1:{rr_box:.1f}\n"
                     f"   💡 <i>Chốt toàn bộ tại cạnh trên hộp. Không tham.</i>"
                 )
             elif is_approaching:
                 scenario = 'SIDEWAYS'
 
-        # KỊ CH BẢN 3: DOWNTREND — BẮT SÓNG HỒI
+        # KỊCH BẢN 3: DOWNTREND — BẮT SÓNG HỒI
         elif trend == 'DOWNTREND':
             deep   = price < ma20 * 0.88
             rsi_ex = not np.isnan(rsi_h1) and rsi_h1 < 28
@@ -723,12 +731,16 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
                     f"   📉 Chiết khấu vs MA20 : {disc:.1f}%\n"
                     f"   📉 RSI H1             : {rsi_h1:.0f}  (cực oversold)\n"
                     f"   💧 Sweep Bullish M15  : {'✅' if has_sw else '—'}\n"
-                    f"   🕯️ Nến đảo chiều M15  : {'✅ Pinbar/Engulfing' if has_rv else '—'}\n"
+                    f"   🕯️ Nến đảo chiều M15  :"
+                    f" {'✅ Pinbar/Engulfing' if has_rv else '—'}\n"
                     f"   💪 RS vs VNI          : {rs:.2f}\n"
-                    f"   💵 Vào lệnh           : <b>{price:.2f}</b>  (MAX 25% vốn)\n"
+                    f"   💵 Vào lệnh           : <b>{price:.2f}</b>"
+                    f"  (MAX 25% vốn)\n"
                     f"   🛑 SL                 : {t['sl']} (-{t['sl_pct']}%)\n"
-                    f"   🎯 TP1 (EMA21 D1)    : {ema21:.2f} (+{((ema21-price)/price*100):.1f}%)\n"
-                    f"   🎯 TP2 (MA20 D1)     : {ma20:.2f} (+{((ma20-price)/price*100):.1f}%)\n"
+                    f"   🎯 TP1 (EMA21 D1)    : {ema21:.2f}"
+                    f" (+{((ema21-price)/price*100):.1f}%)\n"
+                    f"   🎯 TP2 (MA20 D1)     : {ma20:.2f}"
+                    f" (+{((ma20-price)/price*100):.1f}%)\n"
                     f"   ⚖️  R:R               : 1:{t['rr1']}\n"
                     f"   💡 <i>Bán ngay khi chạm EMA21. NO Margin tuyệt đối.</i>"
                 )
@@ -736,9 +748,10 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
         if scenario is None:
             return None
 
-        # Nếu chỉ "tiệm cận" mà chưa có signal → tạo signal đơn giản
+        # Nếu tiệm cận mà chưa có signal → tạo signal đơn giản
         if signal is None and is_approaching:
-            ob_str  = f"{ob_h1['ob_low']}–{ob_h1['ob_high']}" if ob_h1 else "—"
+            ob_str  = (f"{ob_h1['ob_low']}–{ob_h1['ob_high']}"
+                       if ob_h1 else "—")
             ote_str = f"{fibs['ote_low']:.2f}–{fibs['ote_high']:.2f}"
             near_pct = round(near_value * 100, 1)
             signal = (
@@ -747,7 +760,8 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
                 f"   Vùng chờ OB  : {ob_str}\n"
                 f"   Vùng chờ OTE : {ote_str}\n"
                 f"   Cách vùng    : ~{near_pct:.1f}%\n"
-                f"   Score hiện tại: {score}/{MIN_SMC_SCORE} (cần thêm {MIN_SMC_SCORE - score}đ)\n"
+                f"   Score hiện tại: {score}/{MIN_SMC_SCORE}"
+                f" (cần thêm {MIN_SMC_SCORE - score}đ)\n"
                 f"   💡 <i>Chưa đủ điều kiện — theo dõi khi giá tiến vào vùng.</i>"
             )
 
@@ -767,17 +781,20 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
         )
 
         return {
-            'ticker':       ticker,
-            'scenario':     scenario,
-            'score':        score,
-            'message':      message,
-            'approaching':  is_approaching,
-            'near_value':   near_value,
-            'rs':           rs,
+            'ticker':      ticker,
+            'scenario':    scenario,
+            'score':       score,
+            'message':     message,
+            'approaching': is_approaching,
+            'near_value':  near_value,
+            'rs':          rs,
         }
 
     except Exception as e:
         print(f"  [Error] {ticker}: {e}")
+        import traceback
+        if DEBUG_MODE:
+            traceback.print_exc()
         return None
 
 
@@ -787,25 +804,26 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
 def main():
     now = datetime.now()
     print(f"\n{'='*60}")
-    print(f"  VN STOCK SCANNER v4.0")
+    print(f"  VN STOCK SCANNER v3.0-fixed")
     print(f"  {now.strftime('%d/%m/%Y %H:%M:%S')}")
+    print(f"  DEBUG_MODE = {DEBUG_MODE}")
     print(f"{'='*60}\n")
 
     end       = now.strftime('%Y-%m-%d')
     start_d1  = (now - timedelta(days=200)).strftime('%Y-%m-%d')
-    start_h1  = (now - timedelta(days=45)).strftime('%Y-%m-%d')   # 45 ngày H1
-    start_m15 = (now - timedelta(days=10)).strftime('%Y-%m-%d')   # 10 ngày M15
+    start_h1  = (now - timedelta(days=45)).strftime('%Y-%m-%d')
+    start_m15 = (now - timedelta(days=10)).strftime('%Y-%m-%d')
 
     # ── Bước 1: Phân tích thị trường ─────────────────────────────────────────
     print("📊 Phân tích VN-Index...")
     market = get_market_regime(start_d1, end)
-    emoji  = {'BULL': '🟢', 'BEAR': '🔴', 'NEUTRAL': '🟡'}.get(market['regime'], '⚪')
+    emoji  = {'BULL': '🟢', 'BEAR': '🔴', 'NEUTRAL': '🟡'}.get(
+        market['regime'], '⚪')
 
     bear_note = ''
     if market['regime'] == 'BEAR':
         bear_note = (
-            f"\n   ⚠️ BEAR mode — chỉ Long các mã có RS >{RS_MIN_BEAR} "
-            f"(mạnh hơn thị trường)"
+            f"\n   ⚠️ BEAR mode — chỉ Long các mã có RS >{RS_MIN_BEAR}"
         )
 
     send_telegram(
@@ -817,26 +835,31 @@ def main():
         f"   Ret 20p : {market['vnindex_ret20']*100:+.1f}%"
         f"{bear_note}"
     )
+    print(f"  ✅ VN-Index: {market['regime']} | "
+          f"Giá:{market['vnindex_price']} | "
+          f"RSI:{market['rsi']}\n")
 
     # ── Bước 2: Quét watchlist ────────────────────────────────────────────────
     all_results = []
     for i, ticker in enumerate(WATCHLIST):
-        print(f"  [{i+1:3d}/{len(WATCHLIST)}] {ticker}...", end=' ', flush=True)
+        print(f"\n[{i+1:3d}/{len(WATCHLIST)}] {ticker} {'─'*20}")
         res = analyze(ticker, start_d1, start_h1, start_m15, end, market)
         if res:
-            tag = "⏳Approaching" if res['approaching'] else f"✅ Score={res['score']}"
-            print(tag)
+            tag = ("⏳ Approaching"
+                   if res['approaching']
+                   else f"✅ Score={res['score']}")
+            print(f"  → {tag}")
             all_results.append(res)
         else:
-            print("—")
-        time.sleep(3)     # 3 requests/mã × ~20 mã/phút = trong giới hạn Guest; giảm nếu có API key
+            print(f"  → ✗ Không đạt")
+        time.sleep(3)
 
     # ── Bước 3: Phân loại ────────────────────────────────────────────────────
     signals     = [r for r in all_results if not r['approaching']]
     approaching = [r for r in all_results if r['approaching']]
 
     signals.sort(key=lambda x: x['score'], reverse=True)
-    approaching.sort(key=lambda x: x['near_value'])  # gần vùng nhất lên đầu
+    approaching.sort(key=lambda x: x['near_value'])
 
     top          = signals[:TOP_N_SIGNALS]
     top_approach = approaching[:TOP_N_APPROACHING]
@@ -847,7 +870,8 @@ def main():
 
     # ── Bước 4: Gửi tóm tắt ──────────────────────────────────────────────────
     send_telegram(
-        f"🤖 <b>BÁO CÁO SCANNER v4.0 — {now.strftime('%d/%m/%Y %H:%M')}</b>\n"
+        f"🤖 <b>BÁO CÁO SCANNER v3.0-fixed — "
+        f"{now.strftime('%d/%m/%Y %H:%M')}</b>\n"
         f"🔍 Quét <b>{len(WATCHLIST)}</b> mã\n"
         f"   ✅ Tín hiệu đủ tiêu chuẩn : <b>{len(signals)}</b> mã\n"
         f"   ⏳ Tiệm cận điều kiện     : <b>{len(approaching)}</b> mã\n\n"
@@ -875,26 +899,30 @@ def main():
     send_group(sw,   "📦 SIDEWAYS — MUA ĐÁY HỘP")
     send_group(down, "🔪 DOWNTREND — BẮT SÓNG HỒI (cực kỳ thận trọng)")
 
-    # ── Bước 6: Gửi Watchlist "Tiệm cận" ─────────────────────────────────────
     if top_approach:
-        send_group(top_approach, f"⏳ VÙNG CHỜ — TOP {len(top_approach)} MÃ TIỆM CẬN")
+        send_group(top_approach,
+                   f"⏳ VÙNG CHỜ — TOP {len(top_approach)} MÃ TIỆM CẬN")
     else:
-        send_telegram("⏳ <b>VÙNG CHỜ:</b> Không có mã nào đang tiệm cận điều kiện.")
+        send_telegram(
+            "⏳ <b>VÙNG CHỜ:</b> Không có mã nào đang tiệm cận.")
 
-    # ── Bước 7: Kết thúc ─────────────────────────────────────────────────────
     if not top and not top_approach:
         send_telegram(
             "🤖 <b>SCANNER BÁO CÁO:</b>\n\n"
             "Không có mã nào đạt đủ tiêu chuẩn hôm nay.\n\n"
-            "💰 <b>Tiền mặt là vị thế tốt nhất khi thị trường không rõ ràng.</b>"
+            "💰 <b>Tiền mặt là vị thế tốt nhất khi thị trường"
+            " không rõ ràng.</b>"
         )
 
     print(
-        f"\n✅ Xong.\n"
-        f"   Tín hiệu: {len(signals)} → gửi top {len(top)}\n"
-        f"   Tiệm cận: {len(approaching)} → gửi top {len(top_approach)}\n"
+        f"\n{'='*60}\n"
+        f"✅ Hoàn tất.\n"
+        f"   Tín hiệu : {len(signals)} → gửi top {len(top)}\n"
+        f"   Tiệm cận : {len(approaching)} → gửi top {len(top_approach)}\n"
+        f"{'='*60}\n"
     )
 
 
 if __name__ == "__main__":
-    main()              
+    main()
+                          
