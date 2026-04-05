@@ -73,7 +73,7 @@ WATCHLIST = [
 # ===========================================================================
 # TELEGRAM
 # ===========================================================================
- def send_telegram(message: str, retries: int = 3) -> bool:
+def send_telegram(message: str, retries: int = 3) -> bool:
     url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
     for attempt in range(retries):
@@ -84,7 +84,7 @@ WATCHLIST = [
         except Exception as e:
             print(f"  [Telegram retry {attempt+1}] {e}")
             time.sleep(2)
-    return False
+return False
 
 
 # ===========================================================================
