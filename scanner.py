@@ -43,18 +43,18 @@ TP_EXT_127 = 1.272
 TP_EXT_162 = 1.618
 
 WATCHLIST = [
-    'SSI', 'VND', 'VCI', 'HCM', 'SHS', 'MBS', 'FTS', 'CTS', 'BSI', 'VIX',
-    'HPG', 'HSG', 'NKG', 'VGS', 'SMC', 'TLH',
-    'DIG', 'DXG', 'PDR', 'NVL', 'CEO', 'NLG', 'KDH', 'HDG', 'VIC', 'VHM', 'VRE',
-    'VCB', 'BID', 'CTG', 'MBB', 'TCB', 'VPB', 'ACB', 'STB', 'SHB', 'TPB', 'HDB', 'VIB',
-    'GEX', 'PC1', 'POW', 'REE', 'GEG', 'TV2',
-    'FPT', 'MWG', 'PNJ', 'MSN', 'VNM', 'SAB', 'DGW', 'FRT', 'PET',
-    'DGC', 'DPM', 'DCM', 'CSV', 'BFC', 'LAS',
-    'KBC', 'IDC', 'VGC', 'SZC', 'PHR', 'DPR', 'GVR',
-    'PVD', 'PVS', 'BSR', 'OIL', 'PLX', 'GAS', 'PVC',
-    'VHC', 'ANV', 'IDI', 'FMC', 'ASM', 'HAH', 'GMD', 'VOS', 'PVT',
-    'VGI', 'CTR', 'CMG', 'LCG', 'HHV', 'VCG', 'KSB', 'FCN', 'C4G',
+    "ACB", "BID", "CTG", "HDB", "LPB", "MBB", "MSB", "OCB", "SHB", "STB", "TCB", "TPB", "VCB", "VIB", "VPB", 
+    "BAB", "EIB", "NAB", "SSB", "VBB", "VIC", "VHM", "VRE", "BCM", "NVL", "PDR", "DIG", "DXG", "KDH", "NLG", 
+    "KBC", "SZC", "IDC", "VGC", "ITA", "CEO", "TCH", "KHG", "HDG", "DXS", "AGG", "CRE", "QCG", "NTL", "SJS", 
+    "SSI", "VND", "VCI", "HCM", "VIX", "SHS", "FTS", "MBS", "BSI", "CTS", "AGR", "ORS", "TVS", "VDS", "BVS", 
+    "HPG", "HSG", "NKG", "VGS", "POM", "TLH", "SMC", "HT1", "BCC", "BMP", "VCS", "GAS", "PLX", "PVS", "PVD", 
+    "PVT", "BSR", "POW", "GEG", "PC1", "REE", "TV2", "NT2", "BCG", "ASM", "MWG", "MSN", "VNM", "PNJ", "FRT", 
+    "DGW", "PET", "SAB", "KDC", "DBC", "ANV", "IDI", "FPT", "CMG", "CTR", "VGI", "ELC", "FOX", "SAM", "LCW", 
+    "GVR", "DGC", "DCM", "DPM", "PHR", "DPR", "CSV", "LAS", "BFC", "AAA", "GMD", "HAH", "VSC", "VOS", "VIP", 
+    "SGP", "VNA", "PHP", "TMS", "VCG", "LCG", "HHV", "FCN", "C4G", "HBC", "CTD", "CII", "NBB", "DPG", "HUT", 
+    "G36", "HAG", "HNG", "TNG", "MSH", "VGT", "TCM", "GIL", "PAN", "LTG", "NSC"
 ]
+
 
 
 # ===========================================================================
