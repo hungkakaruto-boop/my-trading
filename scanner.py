@@ -94,64 +94,98 @@ def send_telegram(message: str, retries: int = 3) -> bool:
 # ===========================================================================
 # MODULE 1: LẤY DỮ LIỆU
 # ===========================================================================
-def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
-                max_retries: int = 4) -> Optional[pd.DataFrame]:
-    """
-    Lấy OHLCV từ vnstock.
-    resolution : '1D' | '60' (H1) | '15' (M15)
 
-    🔧 FIX: VCI không hỗ trợ intraday → dùng TCBS cho mọi khung < D1.
-      - VCI  → D1 của cổ phiếu thường (tốt hơn về lịch sử)
-      - TCBS → tất cả intraday (H1, M15) + index (VNINDEX, VN30...)
+# ── FIX DATA #1: Bảng chuyển đổi interval ──────────────────────────────────
+# vnstock 3.x TCBS dùng '1H', '15m' — KHÔNG dùng '60', '15'
+# resolution nội bộ → interval thực tế truyền vào API
+_INTERVAL_TCBS = {
+    '1D': '1D', 'D': '1D', '1W': '1W', 'W': '1W',
+    '60': '1H', '1H': '1H',
+    '30': '30m', '15': '15m', '5': '5m', '1': '1m',
+}
+_INTERVAL_VCI = {
+    '1D': '1D', 'D': '1D', '1W': '1W', 'W': '1W',
+}
+
+
+def _normalize_df(df: pd.DataFrame) -> Optional[pd.DataFrame]:
+    """Chuẩn hóa DataFrame: lowercase cột, đặt time làm index."""
+    if df is None or df.empty:
+        return None
+    df = df.copy()
+    df.columns = [c.lower() for c in df.columns]
+    time_col = next(
+        (c for c in df.columns if 'time' in c or 'date' in c),
+        df.columns[0]
+    )
+    df[time_col] = pd.to_datetime(df[time_col])
+    df = (df.rename(columns={time_col: 'time'})
+            .set_index('time')
+            .sort_index())
+    for col in ['open', 'high', 'low', 'close', 'volume']:
+        if col in df.columns:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+    df = df.dropna(subset=['close'])
+    return df if not df.empty else None
+
+
+def _try_fetch(ticker: str, source: str, interval: str,
+               start: str, end: str) -> Optional[pd.DataFrame]:
+    """Thực hiện một lần gọi API vnstock, trả về DataFrame hoặc None."""
+    try:
+        client = Vnstock(api_key=VNSTOCK_API_KEY) if VNSTOCK_API_KEY else Vnstock()
+        _stock = client.stock(symbol=ticker, source=source)
+        df = _stock.quote.history(start=start, end=end, interval=interval)
+        return _normalize_df(df)
+    except Exception as e:
+        print(f"    [fetch] {ticker} src={source} iv={interval}: {e}")
+        return None
+
+
+def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
+                max_retries: int = 3) -> Optional[pd.DataFrame]:
     """
-    wait_times = [10, 20, 40, 60]
+    Lấy OHLCV từ vnstock với:
+      • FIX DATA #1 — Chuyển đổi interval đúng theo từng source
+        ('60'→'1H', '15'→'15m' cho TCBS)
+      • FIX DATA #2 — Fallback source tự động:
+        - D1 cổ phiếu  : VCI trước → TCBS nếu thất bại
+        - Intraday H1/M15: TCBS trước → không fallback (VCI không hỗ trợ)
+        - VNINDEX D1   : TCBS trước → VCI nếu thất bại (FIX DATA #3)
+      • Rate-limit retry với backoff
+    """
+    wait_times = [15, 30, 60]
 
     is_index    = ticker.upper() in ('VNINDEX', 'VN30', 'HNX', 'UPCOM')
     is_intraday = resolution not in ('1D', 'D', '1W', 'W')
 
-    source = 'TCBS' if (is_index or is_intraday) else 'VCI'
+    # Xây danh sách (source, interval) để thử theo thứ tự
+    if is_intraday:
+        iv_tcbs = _INTERVAL_TCBS.get(resolution, resolution)
+        candidates = [('TCBS', iv_tcbs)]          # VCI không có intraday
+    elif is_index:
+        # FIX DATA #3: VNINDEX — thử TCBS trước, VCI sau
+        candidates = [('TCBS', '1D'), ('VCI', '1D')]
+    else:
+        # Cổ phiếu D1: VCI tốt hơn về lịch sử; TCBS là backup
+        candidates = [('VCI', '1D'), ('TCBS', '1D')]
 
-    for attempt in range(max_retries):
-        try:
-            client = (Vnstock(api_key=VNSTOCK_API_KEY)
-                      if VNSTOCK_API_KEY else Vnstock())
-            _stock = client.stock(symbol=ticker, source=source)
-            df = _stock.quote.history(
-                start=start, end=end,
-                interval=resolution
-            )
+    for source, interval in candidates:
+        for attempt in range(max_retries):
+            df = _try_fetch(ticker, source, interval, start, end)
+            if df is not None:
+                if DEBUG_MODE:
+                    print(f"    ✅ {ticker} {resolution} → src={source}"
+                          f" iv={interval} rows={len(df)}")
+                return df
 
-            if df is None or df.empty:
-                return None
+            # Kiểm tra rate-limit: thử lại với backoff
+            time.sleep(wait_times[min(attempt, len(wait_times) - 1)])
 
-            df.columns = [c.lower() for c in df.columns]
-            time_col = next(
-                (c for c in df.columns if 'time' in c or 'date' in c),
-                df.columns[0]
-            )
-            df[time_col] = pd.to_datetime(df[time_col])
-            df = (df.rename(columns={time_col: 'time'})
-                    .set_index('time')
-                    .sort_index())
-            for col in ['open', 'high', 'low', 'close', 'volume']:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-            df = df.dropna(subset=['close'])
-            return df if not df.empty else None
+        print(f"  ⚠️  {ticker} {resolution}: thất bại với source={source}"
+              f" interval={interval} sau {max_retries} lần")
 
-        except Exception as e:
-            err_str = str(e).lower()
-            is_rate_limit = any(k in err_str for k in
-                                ('429', 'rate limit', 'too many', 'giới hạn'))
-            if is_rate_limit and attempt < max_retries - 1:
-                wait = wait_times[attempt]
-                print(f"  ⏳ Rate limit [{ticker} {resolution}] "
-                      f"— chờ {wait}s (lần {attempt+1}/{max_retries})")
-                time.sleep(wait)
-            else:
-                print(f"  [Fetch] {ticker} {resolution} (source={source}): {e}")
-                return None
-
+    print(f"  ❌ {ticker} {resolution}: tất cả sources đều thất bại")
     return None
 
 
@@ -930,8 +964,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-
-
-                          
