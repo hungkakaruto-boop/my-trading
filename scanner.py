@@ -69,7 +69,7 @@ WATCHLIST = [
 ]
 
 # Khởi tạo vnstock (global, dùng chung toàn bộ script)
-stock = Vnstock().stock(symbol='ACB', source='TCBS')
+stock = Vnstock().stock(symbol='ACB', source='KBS')
 
 
 # ===========================================================================
@@ -105,7 +105,7 @@ def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
         try:
             # Truyền api_key nếu có — tăng rate limit từ 20 lên 60+/phút
             client = Vnstock() 
-            _stock = client.stock(symbol=ticker, source='TCBS')
+            _stock = client.stock(symbol=ticker, source='KBS')
             df = _stock.quote.history(
                 symbol=ticker, start=start, end=end,
                 interval=resolution
