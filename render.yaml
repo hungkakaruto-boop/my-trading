@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: vn-stock-scanner
+    runtime: python
+    region: singapore
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --timeout 120 --workers 2
+    healthCheckPath: /
+    envVars:
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: TELEGRAM_CHAT_ID
+        sync: false
+      - key: VNSTOCK_API_KEY
+        sync: false
+      - key: WEBHOOK_URL
+        sync: false
+      - key: DEBUG_MODE
+        value: "false"
+      - key: PYTHON_VERSION
+        value: "3.11.0"
