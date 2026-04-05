@@ -194,6 +194,132 @@ def get_market_regime(start: str, end: str) -> dict:
         return default
 
 
+def send_telegram(message: str, retries: int = 3) -> bool:
+    url     = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": TELEGRAM_CHAT_ID, "text": message, "parse_mode": "HTML"}
+    for attempt in range(retries):
+        try:
+            r = requests.post(url, json=payload, timeout=15)
+            r.raise_for_status()
+            return True
+        except Exception as e:
+            print(f"  [Telegram retry {attempt+1}] {e}")
+            time.sleep(2)
+    return False
+
+
+# ===========================================================================
+# MODULE 1: LẤY DỮ LIỆU
+# ===========================================================================
+def fetch_ohlcv(ticker: str, start: str, end: str, resolution: str = '1D',
+                max_retries: int = 4) -> pd.DataFrame | None:
+    """
+    Lấy OHLCV từ vnstock.
+    resolution : '1D' | '60' (H1) | '15' (M15)
+    max_retries: tự động chờ & thử lại khi bị rate limit (429)
+    """
+    wait_times = [10, 20, 40, 60]   # giây chờ (giây) sau mỗi lần bị chặn
+
+    # VNINDEX & index symbols: dùng TCBS (VCI không hỗ trợ chỉ số)
+    is_index  = ticker.upper() in ('VNINDEX', 'VN30', 'HNX', 'UPCOM')
+    source    = 'TCBS' if is_index else 'VCI'
+
+    for attempt in range(max_retries):
+        try:
+            # Truyền api_key nếu có — tăng rate limit từ 20 lên 60+/phút
+            client = (Vnstock(api_key=VNSTOCK_API_KEY)
+                      if VNSTOCK_API_KEY else Vnstock())
+            _stock = client.stock(symbol=ticker, source=source)
+            # LƯU Ý: quote.history() KHÔNG nhận tham số symbol —
+            # symbol đã được set lúc tạo object ở trên
+            df = _stock.quote.history(
+                start=start, end=end,
+                interval=resolution
+            )
+
+            if df is None or df.empty:
+                return None
+
+            df.columns = [c.lower() for c in df.columns]
+            time_col = next(
+                (c for c in df.columns if 'time' in c or 'date' in c),
+                df.columns[0]
+            )
+            df[time_col] = pd.to_datetime(df[time_col])
+            df = df.rename(columns={time_col: 'time'}).set_index('time').sort_index()
+            for col in ['open', 'high', 'low', 'close', 'volume']:
+                if col in df.columns:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+            df = df.dropna(subset=['close'])
+            return df if not df.empty else None
+
+        except Exception as e:
+            err_str = str(e).lower()
+            # Phát hiện Rate Limit (HTTP 429 hoặc thông báo tiếng Việt/Anh)
+            is_rate_limit = ('429' in err_str
+                             or 'rate limit' in err_str
+                             or 'too many' in err_str
+                             or 'giới hạn' in err_str)
+            if is_rate_limit and attempt < max_retries - 1:
+                wait = wait_times[attempt]
+                print(f"  ⏳ Rate limit [{ticker} {resolution}] "
+                      f"— chờ {wait}s (lần {attempt+1}/{max_retries})")
+                time.sleep(wait)
+            else:
+                print(f"  [Fetch] {ticker} {resolution}: {e}")
+                return None
+
+    return None   # hết số lần thử
+
+
+# ===========================================================================
+# MODULE 2: BỘ LỌC VN-INDEX + RELATIVE STRENGTH
+# ===========================================================================
+def get_market_regime(start: str, end: str) -> dict:
+    """
+    Phân tích VN-Index:
+    BULL   → Long tự do
+    NEUTRAL → Long chọn lọc
+    BEAR   → Chỉ Long nếu RS mã > RS_MIN_BEAR, hoặc bắt sóng hồi
+    """
+    default = {
+        'regime': 'NEUTRAL', 'allow_long': True,
+        'vnindex_price': 0, 'rsi': 50, 'ma20': 0, 'ma50': 0,
+        'vnindex_ret20': 0.0
+    }
+    # fetch_ohlcv tự chọn source=TCBS cho VNINDEX
+    df = fetch_ohlcv('VNINDEX', start, end, '1D')
+    if df is None or df.empty or len(df) < 55:
+        print("  [Market] Không lấy được VNINDEX — dùng NEUTRAL mặc định (allow_long=True)")
+        return default   # NEUTRAL → vẫn cho phép quét, không chặn toàn bộ
+    try:
+        df['ma20'] = ta.sma(df['close'], length=20)
+        df['ma50'] = ta.sma(df['close'], length=50)
+        df['rsi']  = ta.rsi(df['close'], length=14)
+        latest = df.iloc[-1]
+        p, m20, m50, rsi = latest['close'], latest['ma20'], latest['ma50'], latest['rsi']
+
+        # Tỷ suất sinh lợi 20 phiên của VN-Index (dùng tính RS)
+        ret20 = (p / df['close'].iloc[-RS_LOOKBACK - 1] - 1) if len(df) > RS_LOOKBACK + 1 else 0.0
+
+        if p > m20 and p > m50 and m20 > m50:
+            regime, allow = 'BULL', True
+        elif p < m20 * 0.95 and p < m50:
+            regime, allow = 'BEAR', False   # RS riêng lẻ quyết định sau
+        else:
+            regime, allow = 'NEUTRAL', True
+
+        return {
+            'regime': regime, 'allow_long': allow,
+            'vnindex_price': round(p, 2), 'rsi': round(rsi, 1),
+            'ma20': round(m20, 2), 'ma50': round(m50, 2),
+            'vnindex_ret20': round(ret20, 4)
+        }
+    except Exception as e:
+        print(f"  [Market] {e}")
+        return default
+
+
 def calc_relative_strength(df_stock: pd.DataFrame, vnindex_ret20: float) -> float:
     """
     RS = tỷ suất sinh lợi mã / tỷ suất sinh lợi VN-Index trong 20 phiên.
@@ -347,6 +473,7 @@ def detect_structure(df: pd.DataFrame, lookback: int = 40) -> dict:
         'last_sh': sh[-1] if sh else highs.max(),
         'last_sl': sl[-1] if sl else lows.min(),
     }
+
 
 # ===========================================================================
 # MODULE 8: LIQUIDITY SWEEP (M15) — chuyển từ H1 xuống M15
@@ -828,7 +955,7 @@ def main():
             all_results.append(res)
         else:
             print("—")
-        time.sleep(0.5)   # tránh rate-limit
+        time.sleep(3)     # 3 requests/mã × ~20 mã/phút = trong giới hạn Guest; giảm nếu có API key
 
     # ── Bước 3: Phân loại ────────────────────────────────────────────────────
     signals     = [r for r in all_results if not r['approaching']]
@@ -896,5 +1023,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()                
-            
+    main()              
