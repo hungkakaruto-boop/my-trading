@@ -1,8 +1,10 @@
-numpy
-requests
+vnstock
 pandas
 pandas-ta
-vnstock
+pyTelegramBotAPI
+flask
+requests
+numpy
 vnstock3
 datetime
 ipython
