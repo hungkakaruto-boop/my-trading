@@ -4,7 +4,6 @@ pandas-ta
 pyTelegramBotAPI
 flask
 requests
-numpy
 vnstock3
 datetime
 ipython
