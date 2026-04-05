@@ -161,9 +161,11 @@ def get_market_regime(start: str, end: str) -> dict:
         'vnindex_price': 0, 'rsi': 50, 'ma20': 0, 'ma50': 0,
         'vnindex_ret20': 0.0
     }
+    # fetch_ohlcv tự chọn source=TCBS cho VNINDEX
     df = fetch_ohlcv('VNINDEX', start, end, '1D')
-    if df is None or len(df) < 55:
-        return default
+    if df is None or df.empty or len(df) < 55:
+        print("  [Market] Không lấy được VNINDEX — dùng NEUTRAL mặc định (allow_long=True)")
+        return default   # NEUTRAL → vẫn cho phép quét, không chặn toàn bộ
     try:
         df['ma20'] = ta.sma(df['close'], length=20)
         df['ma50'] = ta.sma(df['close'], length=50)
