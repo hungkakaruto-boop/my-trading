@@ -837,21 +837,61 @@ def analyze(ticker: str, start_d1: str, start_h1: str, start_m15: str,
         return None
 
 
+
+# ===========================================================================
+# HELPER: PHIÊN GIAO DỊCH GẦN NHẤT
+# ===========================================================================
+def get_last_trading_day(ref=None):
+    """
+    Trả về ngày giao dịch gần nhất tính từ `ref` (mặc định: hôm nay).
+
+    Logic:
+      • Thứ 7  → lùi 1 ngày về Thứ 6
+      • Chủ Nhật → lùi 2 ngày về Thứ 6
+      • T2-T6 trước 9:00 SA → lùi về ngày giao dịch hôm qua
+      • T2-T6 từ 9:00 SA → dùng hôm nay
+    """
+    if ref is None:
+        ref = datetime.now()
+    d = ref
+    if d.weekday() == 5:          # Thứ 7
+        d = d - timedelta(days=1)
+    elif d.weekday() == 6:        # Chủ Nhật
+        d = d - timedelta(days=2)
+    else:
+        # Ngày trong tuần nhưng trước giờ mở cửa 9:00
+        market_open = d.replace(hour=9, minute=0, second=0, microsecond=0)
+        if d < market_open:
+            d = d - timedelta(days=1)
+            if d.weekday() == 5:
+                d = d - timedelta(days=1)
+            elif d.weekday() == 6:
+                d = d - timedelta(days=2)
+    return d
+
 # ===========================================================================
 # MAIN
 # ===========================================================================
 def main():
-    now = datetime.now()
+    now         = datetime.now()
+    trading_day = get_last_trading_day(now)
+    is_weekend  = now.weekday() >= 5
+
+    day_names = {0:'Thứ 2',1:'Thứ 3',2:'Thứ 4',3:'Thứ 5',4:'Thứ 6',5:'Thứ 7',6:'Chủ Nhật'}
     print(f"\n{'='*60}")
     print(f"  VN STOCK SCANNER v3.0-fixed")
-    print(f"  {now.strftime('%d/%m/%Y %H:%M:%S')}")
+    print(f"  Thời gian chạy : {now.strftime('%d/%m/%Y %H:%M:%S')} ({day_names[now.weekday()]})")
+    print(f"  Phiên gần nhất : {trading_day.strftime('%d/%m/%Y')} ({day_names[trading_day.weekday()]})")
+    if is_weekend:
+        print(f"  ⚠️  Cuối tuần — dùng dữ liệu đóng cửa Thứ 6")
     print(f"  DEBUG_MODE = {DEBUG_MODE}")
     print(f"{'='*60}\n")
 
-    end       = now.strftime('%Y-%m-%d')
-    start_d1  = (now - timedelta(days=200)).strftime('%Y-%m-%d')
-    start_h1  = (now - timedelta(days=45)).strftime('%Y-%m-%d')
-    start_m15 = (now - timedelta(days=10)).strftime('%Y-%m-%d')
+    # Dùng phiên giao dịch gần nhất — không bao giờ dùng ngày T7/CN
+    end       = trading_day.strftime('%Y-%m-%d')
+    start_d1  = (trading_day - timedelta(days=200)).strftime('%Y-%m-%d')
+    start_h1  = (trading_day - timedelta(days=45)).strftime('%Y-%m-%d')
+    start_m15 = (trading_day - timedelta(days=10)).strftime('%Y-%m-%d')
 
     # ── Bước 1: Phân tích thị trường ─────────────────────────────────────────
     print("📊 Phân tích VN-Index...")
@@ -910,7 +950,7 @@ def main():
     # ── Bước 4: Gửi tóm tắt ──────────────────────────────────────────────────
     send_telegram(
         f"🤖 <b>BÁO CÁO SCANNER v3.0-fixed — "
-        f"{now.strftime('%d/%m/%Y %H:%M')}</b>\n"
+        f"{trading_day.strftime('%d/%m/%Y')} (phiên gần nhất)</b>\n"
         f"🔍 Quét <b>{len(WATCHLIST)}</b> mã\n"
         f"   ✅ Tín hiệu đủ tiêu chuẩn : <b>{len(signals)}</b> mã\n"
         f"   ⏳ Tiệm cận điều kiện     : <b>{len(approaching)}</b> mã\n\n"
